@@ -1,0 +1,6 @@
+# 固定工具链版本：本机与 CI 用同一个编译器，避免"我这儿能过"。
+# 升级时同步检查 Cargo.toml 的 rust-version（MSRV），CI 有独立的 MSRV job 守着。
+[toolchain]
+channel = "1.97.1"
+profile = "minimal"
+components = ["clippy", "rust-src", "rustfmt"]

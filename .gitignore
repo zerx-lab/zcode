@@ -19,4 +19,5 @@ Thumbs.db
 # 以下 .omp/ 内容**应当提交**，此处仅作备忘，勿添加忽略规则：
 #   config.yml  RULES.md  README.md  lsp.json  WATCHDOG.md  WATCHDOG.yml
 #   rules/  agents/  commands/  extensions/
-plans/tui/
+# plans/ 必须提交：`AGENTS.md` 与 `crates/tui/src/lib.rs` 都把它当设计事实来源，
+# 忽略它会让干净 clone（含 CI）里的索引坐标全部悬空，index-guard 也会必红。

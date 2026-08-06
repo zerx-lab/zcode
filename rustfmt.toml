@@ -1,0 +1,9 @@
+# 仅使用 stable rustfmt 支持的选项：nightly-only 选项会让 `cargo fmt --check` 在
+# 固定的 stable 工具链上直接失败（group_imports / imports_granularity 等因此不启用）。
+edition = "2024"
+style_edition = "2024"
+max_width = 100
+# 开发机是 Windows，产物与 CI 是三平台：统一 LF，配合 .gitattributes 防止 CRLF 混入。
+newline_style = "Unix"
+use_field_init_shorthand = true
+use_try_shorthand = true

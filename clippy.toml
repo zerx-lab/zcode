@@ -1,0 +1,12 @@
+# 测试代码不受 rule://rust-quality 的库代码 panic 约束（见 rule://rust-testing）。
+allow-expect-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-panic-in-tests = true
+allow-unwrap-in-tests = true
+
+# 产品名与终端/协议专名不是代码标识符，doc_markdown 不该要求给它们加反引号。
+# `".."` = 在 clippy 默认白名单基础上扩展，而非替换。
+doc-valid-idents = ["ConPTY", "DECSTBM", "OpenAI", "ZCode", ".."]
+
+# disallowed-methods 待中央包装层（git/jj/进程/宽度计算）落盘后再加：
+# 现在写等于给不存在的调用点设栅栏，只会在第一批实现里被 allow 掉。

@@ -6,19 +6,19 @@ description: ZCode 特有构件约束：crate 职责与导入边界、worker 子
 
 ## Crate 职责表
 
-目标 workspace 由 9 个 crate 组成；下表是**目标形态**，crate 尚未落盘，路径均标 `(planned)`。对应 crate 落盘后，从该行删除 `(planned)` 标记，不要整表一次性摘掉。
+目标 workspace 由 9 个 crate 组成。九个 crate 目录均已落盘（只有 `zcode` 与 `zcode-utils` 有实现，其余暂为骨架）；表内其他路径仍标 `(planned)` 的，落盘后逐条删除标记，不要整表一次性摘掉。
 
 | Crate | 包名 | 职责 |
 | --- | --- | --- |
-| `crates/ai/` (planned) | `zcode-ai` | 支持流式传输的多提供商 LLM 客户端 |
-| `crates/catalog/` (planned) | `zcode-catalog` | 模型目录：内置 `models.json`、提供商描述符、模型身份识别/分类 |
-| `crates/agent/` (planned) | `zcode-agent` | 支持工具调用和状态管理的 Agent 运行时 |
-| `crates/coding-agent/` (planned) | `zcode` | 主 CLI 应用程序，是首要关注对象 |
-| `crates/tui/` (planned) | `zcode-tui` | 支持差分渲染的终端 UI 库 |
-| `crates/text/` (planned) | `zcode-text` | 性能关键型文本、图像及 grep 操作 |
-| `crates/stats/` (planned) | `zcode-stats` | 本地可观测性仪表盘（`zcode stats`） |
-| `crates/schema/` (planned) | `zcode-schema` | JSON Schema 校验，惰性编译运行时 |
-| `crates/utils/` (planned) | `zcode-utils` | 共享工具（日志、流、临时文件、进程包装） |
+| `crates/ai/` | `zcode-ai` | 支持流式传输的多提供商 LLM 客户端 |
+| `crates/catalog/` | `zcode-catalog` | 模型目录：内置 `models.json`、提供商描述符、模型身份识别/分类 |
+| `crates/agent/` | `zcode-agent` | 支持工具调用和状态管理的 Agent 运行时 |
+| `crates/coding-agent/` | `zcode` | 主 CLI 应用程序，是首要关注对象 |
+| `crates/tui/` | `zcode-tui` | 支持差分渲染的终端 UI 库 |
+| `crates/text/` | `zcode-text` | 性能关键型文本、图像及 grep 操作 |
+| `crates/stats/` | `zcode-stats` | 本地可观测性仪表盘（`zcode stats`） |
+| `crates/schema/` | `zcode-schema` | JSON Schema 校验，惰性编译运行时 |
+| `crates/utils/` | `zcode-utils` | 共享工具（日志、流、临时文件、进程包装） |
 
 ## Catalog 导入边界
 
@@ -26,7 +26,7 @@ description: ZCode 特有构件约束：crate 职责与导入边界、worker 子
 
 ## Worker 子进程契约
 
-Worker **必须重入 CLI 入口**，绝不编译独立的 worker 二进制。CLI 入口 crate（`crates/coding-agent/` (planned)）的 `main.rs` (planned) 在启动时通过 `zcode_utils::env::declare_worker_host_entry()` 将自身声明为 worker host，并在加载命令注册表之前分派隐藏的 argv selector（`__zcode_worker_stats_sync`、`__zcode_worker_tab`、`__zcode_worker_eval`、`__zcode_worker_tiny_inference`）。启动方必须走这条路径：
+Worker **必须重入 CLI 入口**，绝不编译独立的 worker 二进制。CLI 入口 crate（`crates/coding-agent/`）的 `src/main.rs` 在启动时通过 `zcode_utils::env::declare_worker_host_entry()` 将自身声明为 worker host（已落盘），并须在加载命令注册表之前分派隐藏的 argv selector（`__zcode_worker_stats_sync`、`__zcode_worker_tab`、`__zcode_worker_eval`、`__zcode_worker_tiny_inference`）——**分发表尚未落盘**，第一个 worker 落地时一并加。启动方必须走这条路径：
 
 ```rust
 use zcode_utils::env::worker_host_entry;
@@ -38,7 +38,7 @@ let child = Command::new(worker_host_entry()?)
     .spawn()?;
 ```
 
-进程经 zcode CLI 启动时（`cargo run`、`cargo install` 安装的二进制、发布的静态二进制均适用），`worker_host_entry()` 就是 `std::env::current_exe()`，worker 重入同一个二进制。不处于 CLI host 中时（`cargo test`、库嵌入、独立运行的 `zcode-stats`），该函数返回 `Err`，必须回退到进程内线程实现（`tokio::spawn` + 同一份 worker 逻辑）。新增 worker 类型时**必须**：把 selector 加入 `main.rs` (planned) 的分发表、保留进程内 fallback 分支、补一个同级 smoke 测试。
+进程经 zcode CLI 启动时（`cargo run`、`cargo install` 安装的二进制、发布的静态二进制均适用），`worker_host_entry()` 返回启动时记录的 `std::env::current_exe()`，worker 重入同一个二进制。不处于 CLI host 中时（`cargo test`、库嵌入、独立运行的 `zcode-stats`），该函数返回 `Err(WorkerHostError::NotDeclared)`，必须回退到进程内线程实现（`tokio::spawn` + 同一份 worker 逻辑）。新增 worker 类型时**必须**：把 selector 加入 `crates/coding-agent/src/main.rs` 的分发表、保留进程内 fallback 分支、补一个同级 smoke 测试。
 
 **历史缘由**（不得丢）：早期方案是每个 worker 声明独立 `[[bin]]` 目标，导致 `cargo install` 与打包脚本必须始终同步两套目标列表，漏掉一个就在安装后静默失败——这是为何所有 worker 现在统一走重入 CLI 入口这条路径。
 

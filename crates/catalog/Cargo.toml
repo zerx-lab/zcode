@@ -1,0 +1,17 @@
+[package]
+name = "zcode-catalog"
+description = "模型目录：内置 models.json、提供商描述符、模型身份识别与分类"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

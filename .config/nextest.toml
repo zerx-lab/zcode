@@ -1,0 +1,13 @@
+[profile.default]
+# 一次跑完看全部失败，而不是撞到第一个就停。
+fail-fast = false
+# 超过 30s 的测试打标；连续 4 个周期没结束视为挂死并终止。
+slow-timeout = { period = "30s", terminate-after = 4 }
+
+[profile.ci]
+fail-fast = false
+failure-output = "immediate-final"
+status-level = "fail"
+final-status-level = "slow"
+# 不靠重试掩盖 flaky：测试必须并行安全（见 rule://rust-testing）。
+retries = 0

@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # CI 每次都是干净 checkout，增量编译只会撑大缓存。
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+  # 刻意不设全局 RUSTFLAGS=-D warnings：那会把依赖的告警也变成错误，上游一个
+  # deprecation 就能红掉整条流水线。rustc lint 由 clippy job 的 -D warnings 覆盖。
+
+jobs:
+  # 工具链版本由 rust-toolchain.toml 固定，runner 上的 rustup 会自动装对应版本，
+  # 因此除 MSRV job 外都不显式指定 toolchain。
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: clippy (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - run: cargo nextest run --locked --workspace --all-features --profile ci
+      # nextest 不跑 doctest，必须单独来一轮。
+      - run: cargo test --locked --doc --workspace --all-features
+
+  # 三个 runner（ubuntu x86_64 / macos arm64 / windows x86_64）覆盖不到的目标：
+  # 只做 cargo check——check 不链接，因此不需要交叉链接器或交叉 C 工具链。
+  cross-check:
+    name: cross-check (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-apple-darwin
+          - aarch64-pc-windows-msvc
+          - aarch64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: rustup target add ${{ matrix.target }}
+      - run: cargo check --locked --workspace --all-targets --all-features --target ${{ matrix.target }}
+
+  msrv:
+    name: msrv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+      # MSRV 取自 CLI 包的 rust-version（成员全部继承 workspace 值），避免与清单漂移。
+      # RUSTUP_TOOLCHAIN 覆盖 rust-toolchain.toml 的固定版本。
+      - run: |
+          msrv="$(cargo metadata --format-version 1 --no-deps \
+            | jq -er '.packages[] | select(.name == "zcode") | .rust_version')"
+          echo "MSRV = $msrv"
+          rustup toolchain install "$msrv" --profile minimal
+          RUSTUP_TOOLCHAIN="$msrv" cargo check --locked --workspace --all-targets --all-features
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --locked --workspace --no-deps --all-features
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check all
+
+  unused-deps:
+    name: cargo-machete
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-machete
+      - run: cargo machete
+
+  index-guard:
+    name: AGENTS.md 索引校验
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - run: bun .omp/checks/index-guard.check.ts

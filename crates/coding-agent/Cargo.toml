@@ -1,0 +1,20 @@
+[package]
+name = "zcode"
+description = "ZCode —— 终端里的 coding agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+zcode-utils.workspace = true

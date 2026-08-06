@@ -1,0 +1,18 @@
+[package]
+name = "zcode-utils"
+description = "ZCode 跨 crate 共享工具：日志、流、临时文件、进程包装"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror.workspace = true

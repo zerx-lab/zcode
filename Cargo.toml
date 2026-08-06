@@ -1,0 +1,82 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+# ── 所有成员共享的包元数据 ──────────────────────────────────────────────
+# 成员 crate 一律写 `version.workspace = true` 等继承形式，绝不各自固定。
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/zerx-lab/zcode"
+homepage = "https://github.com/zerx-lab/zcode"
+authors = ["zerx-lab"]
+keywords = ["agent", "llm", "cli", "tui"]
+categories = ["command-line-utilities", "development-tools"]
+
+# ── 依赖版本单一事实来源 ────────────────────────────────────────────────
+# 见 rule://rust-quality：成员 crate 只写 `dep.workspace = true`。
+# 新增依赖先加到这里，再在成员 crate 引用；不在成员 crate 里固定不同版本。
+[workspace.dependencies]
+# workspace 内部 crate（path + version 双写，发布时才能解析到 crates.io）
+zcode-agent = { path = "crates/agent", version = "0.1.0" }
+zcode-ai = { path = "crates/ai", version = "0.1.0" }
+zcode-catalog = { path = "crates/catalog", version = "0.1.0" }
+zcode-schema = { path = "crates/schema", version = "0.1.0" }
+zcode-stats = { path = "crates/stats", version = "0.1.0" }
+zcode-text = { path = "crates/text", version = "0.1.0" }
+zcode-tui = { path = "crates/tui", version = "0.1.0" }
+zcode-utils = { path = "crates/utils", version = "0.1.0" }
+
+# 外部依赖
+anyhow = "1.0"
+clap = { version = "4.6", features = ["derive"] }
+thiserror = "2.0"
+
+# ── lint 单一事实来源 ───────────────────────────────────────────────────
+# 成员 crate 一律写 `[lints] workspace = true`，绝不另建一套。
+[workspace.lints.rust]
+missing_debug_implementations = "warn"
+missing_docs = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unreachable_pub = "warn"
+# FFI（Windows VT 启用、Unix job control）必须逐个 crate 显式 allow 并写 SAFETY 注释。
+unsafe_code = "deny"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# rule://rust-quality 的硬约束：库代码不得 panic，不得用 `as` 做数值转换。
+# 测试内的 unwrap/expect/panic 由 clippy.toml 的 allow-*-in-tests 放行。
+as_conversions = "deny"
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_precision_loss = "deny"
+cast_sign_loss = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+unwrap_used = "deny"
+# 噪声大于收益的 pedantic 项
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+
+# ── 构建剖面 ────────────────────────────────────────────────────────────
+[profile.dev]
+# 只保留行号表：backtrace 仍可用，链接明显更快（Windows 上尤其）。
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+# 依赖极少改动，优化后编译一次换全程更快的调试运行（TUI 渲染路径明显）。
+opt-level = 2
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = "debuginfo"

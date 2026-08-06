@@ -1,0 +1,18 @@
+# 统一以 LF 存入仓库：开发机是 Windows，CI 跑三平台，snapshot 测试对行尾敏感。
+* text=auto eol=lf
+
+*.rs text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# 二进制资源不做行尾转换
+*.png binary
+*.ico binary
+*.snap -text
+
+Cargo.lock linguist-generated=true merge=binary

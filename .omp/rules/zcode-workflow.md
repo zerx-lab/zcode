@@ -19,7 +19,7 @@ description: ZCode 交付流程约束：GitHub 行为限制、commit/merge 信�
 
 ## Changelog
 
-位置：`crates/*/CHANGELOG.md` (planned)，每个 crate 各自维护一份。
+位置：`crates/*/CHANGELOG.md`，每个 crate 各自维护一份。
 
 **格式**——`## [Unreleased]` 下按固定顺序排列的 section：
 
