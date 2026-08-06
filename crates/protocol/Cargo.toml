@@ -1,0 +1,23 @@
+[package]
+name = "zcode-protocol"
+description = "ZCode 客户端与运行时之间的 wire 协议：信封、版本协商、NDJSON 分帧"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+# 这个 crate 是边界本身：它**不得**依赖任何 workspace 内的运行时或 UI crate。
+# 依赖方向是 tui -> protocol <- runtime，两侧都不许绕过它互相直连。
+[dependencies]
+memchr.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

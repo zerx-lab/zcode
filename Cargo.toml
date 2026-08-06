@@ -23,6 +23,7 @@ categories = ["command-line-utilities", "development-tools"]
 zcode-agent = { path = "crates/agent", version = "0.1.0" }
 zcode-ai = { path = "crates/ai", version = "0.1.0" }
 zcode-catalog = { path = "crates/catalog", version = "0.1.0" }
+zcode-protocol = { path = "crates/protocol", version = "0.1.0" }
 zcode-schema = { path = "crates/schema", version = "0.1.0" }
 zcode-stats = { path = "crates/stats", version = "0.1.0" }
 zcode-text = { path = "crates/text", version = "0.1.0" }
@@ -31,8 +32,70 @@ zcode-utils = { path = "crates/utils", version = "0.1.0" }
 
 # 外部依赖
 anyhow = "1.0"
+async-trait = "0.1"
+base64 = "0.23"
+bytes = "1.12"
 clap = { version = "4.6", features = ["derive"] }
+futures-core = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+getrandom = "0.4"
+grep-regex = "0.1"
+grep-searcher = "0.1"
+ignore = "0.4"
+# 只开我们真正解码/编码的格式：默认 feature 会拖进 avif/exr/tiff 等一大票编解码器。
+image = { version = "0.25", default-features = false, features = [
+  "gif",
+  "jpeg",
+  "png",
+  "rayon",
+  "webp",
+] }
+memchr = "2.8"
+rayon = "1.12"
+regex = "1.13"
+# bundled：不依赖系统 sqlite，跨平台构建一致（本机 MSVC C 工具链已验证可编译）。
+rusqlite = { version = "0.40", features = ["bundled"] }
+unicode-segmentation = "1.13"
+unicode-width = "0.2"
+reqwest = { version = "0.13", default-features = false, features = [
+  "charset",
+  "form",
+  "http2",
+  "json",
+  "rustls-no-provider",
+  "stream",
+  "system-proxy",
+] }
+# reqwest 的 `rustls` feature 会拖进 aws-lc-sys（本机无 NASM/CMake，构建必然失败）。
+# 改用 `rustls-no-provider` + ring，由 `zcode_ai::http` 在建 Client 前安装 process default provider。
+rustls = { version = "0.23", default-features = false, features = [
+  "logging",
+  "ring",
+  "std",
+  "tls12",
+] }
+serde = { version = "1.0", features = ["derive"] }
+# raw_value：zcode-catalog 的两级惰性解析靠 `RawValue` 只切子串，不构造 6149 个 ModelSpec。
+serde_json = { version = "1.0", features = ["raw_value"] }
+sha2 = "0.11"
 thiserror = "2.0"
+tokio = { version = "1.53", features = [
+  "fs",
+  "io-util",
+  "macros",
+  "net",
+  "rt",
+  "sync",
+  "time",
+] }
+tracing = "0.1"
+url = "2.5"
+webbrowser = "1.2"
+zstd = "0.13"
+
+# 仅测试用
+mockito = "1.7"
+tempfile = "3"
 
 # ── lint 单一事实来源 ───────────────────────────────────────────────────
 # 成员 crate 一律写 `[lints] workspace = true`，绝不另建一套。

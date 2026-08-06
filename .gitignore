@@ -21,3 +21,4 @@ Thumbs.db
 #   rules/  agents/  commands/  extensions/
 # plans/ 必须提交：`AGENTS.md` 与 `crates/tui/src/lib.rs` 都把它当设计事实来源，
 # 忽略它会让干净 clone（含 CI）里的索引坐标全部悬空，index-guard 也会必红。
+.zed/

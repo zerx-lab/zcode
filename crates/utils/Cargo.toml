@@ -16,3 +16,12 @@ workspace = true
 
 [dependencies]
 thiserror.workspace = true
+tokio.workspace = true
+
+# pipe 名需要对小写归一化后的路径做摘要，见 src/transport/windows.rs。
+[target.'cfg(windows)'.dependencies]
+sha2.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }

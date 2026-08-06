@@ -5,8 +5,12 @@
 #
 # 因此本文件刻意不写任何数组键：
 #   disabledProviders / enabledModels / cycleOrder / modelProviderOrder /
-#   skills.customDirectories / bashInterceptor.patterns
-# 写了会把用户级同名数组整表覆盖 —— 例如把用户已禁用的 discovery provider 重新放出来。
+#   skills.customDirectories / bash.patterns / bashInterceptor.patterns
+# 写了会把用户级同名数组整表覆盖 —— 例如把用户已禁用的 discovery provider 重新放出来，
+# 或者把使用者自己配的 bash 拦截规则整表抹掉。这条没有例外：项目仓库不该拿掉
+# 使用者的个人护栏，也不该要求他们把个人规则搬进项目配置。
+#
+# 发布类与破坏性命令的红线因此归 `.omp/RULES.md`（always-apply，无需手动读）。
 #
 # 同理不写 tools.approvalMode、theme、modelRoles：那些是使用者的人机偏好，不是项目属性。
 #
@@ -16,22 +20,3 @@ lsp:
   # 编辑 .rs 后立即跑 rust-analyzer 诊断，错误当轮进 agent 循环，不必等到 cargo check。
   # 默认 false（写入后诊断 diagnosticsOnWrite 默认已是 true）。
   diagnosticsOnEdit: true
-
-bash:
-  # 有序列表，首个匹配生效。这里只放 deny/prompt 护栏，
-  # 故意不写 `match: "*"` 兜底 —— 未匹配的命令继续走使用者自己的 approvalMode。
-  patterns:
-    - match: "cargo publish*"
-      approval: deny
-    - match: "cargo owner*"
-      approval: deny
-    - match: "cargo yank*"
-      approval: deny
-    - match: "git push --force*"
-      approval: deny
-    - match: "git push -f*"
-      approval: deny
-    - match: "git reset --hard*"
-      approval: prompt
-    - match: "git clean -fd*"
-      approval: prompt

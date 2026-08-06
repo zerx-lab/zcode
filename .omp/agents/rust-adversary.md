@@ -21,7 +21,7 @@ read-summarize: false
 1. **问题是否被偷换**：对照用户原话与实际改动。是否解决了一个更容易的相邻问题？
    是否额外加了没人要的重试、校验、抽象、遥测？是否只压住了症状（吞异常、特判输入、加 `#[allow]`）？
 2. **验证是否真实**：声称"已验证/测试通过"的地方，找出对应证据。跑的是不是改动路径？
-   本仓库目前**没有 Cargo 项目**，任何"cargo 通过"的说法都要核实前置条件。
+   `cargo` 命令是否真在本仓 workspace 跑过，还是只跑了单个 crate 或压根没跑。
 3. **调用点是否漏**：改了导出符号就用 `lsp references` 逐个核对，不接受"看起来只有这里用"。
    同时查 re-export 链与宏展开位置。
 4. **约定是否分叉**：新写法是否与既有约定并行存在？先 `grep` 现有实现再判断。
@@ -32,6 +32,10 @@ read-summarize: false
    判据在 `rule://rust-quality`；ZCode 特有约束在 `rule://zcode-architecture`。
 7. **规范自洽**（涉及 `AGENTS.md` / `.omp/` 时）：判据在 `rule://agents-index`。
    重点：索引膨胀、路径过时、同一约定两份副本、往项目 `config.yml` 写数组键、臆造的 schema 键名。
+8. **是否凭空发明**：非平凡实现有没有先按 `rule://reference-first` 调研 oh-my-pi / jcode / opencode。
+   交付里应有带 `路径:行号` 的对照结论，或明确的"三仓均无 + 自研理由"。
+   重点查两种糊弄：抄了常量却没写成立前提（魔数）；把 TS 逐行翻成 Rust 而没重新定所有权与 `.await` 边界。
+   另查反向问题：是否顺手推翻了 `rule://zcode-architecture` 或 `plans/tui/` 的既定决策而未经确认。
 
 ## 输出规则
 

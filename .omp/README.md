@@ -77,7 +77,7 @@ settings 层的合并规则是：对象深合并，**标量与数组整层替换
 - **`lsp.json` 一旦提供非空 `servers`，就不再是纯自动检测**：override 会先合并到内置 defaults，
   然后按 root marker 匹配、二进制可解析、非 disabled 过滤。当前只覆盖 `capabilities` 与
   `workspaceReadyTimings`，其余继承内置定义。
-- **rust-analyzer 的 root marker 只看启动目录一层**：`Cargo.toml` (planned) 落盘前，LSP 不会启动。
+- **rust-analyzer 的 root marker 只看启动目录一层**：必须在含根 `Cargo.toml` 的目录启动 omp，LSP 才会拉起。
 - **`autolearn` 那条路走不通**：`learn` / `manage_skill` 只在 `autolearn.enabled` 为真时注册，
   且 managed skill 落在**用户**目录；使用者当前把 `autolearn` 关着，`disabledProviders` 里还有
   `omp-managed`。项目沉淀知识的路径是 `AGENTS.md` + index-guard + `/sync-index`，**不是** autolearn。

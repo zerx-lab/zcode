@@ -6,11 +6,10 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 
 ## 现状
 
-- 阶段：**workspace 骨架已落盘** —— 根 `Cargo.toml` 集中管版本/依赖/lint，`crates/` 九个成员全部通过
-  fmt / clippy / nextest / doctest / deny / machete；CI 覆盖三平台原生矩阵、交叉编译 check 与 MSRV。
-  不要在本文件枚举仓库里有哪些文件：那种陈述必然过时，仓库现状看目录列表。
-- 唯一已实现的业务逻辑是 `zcode-utils` 的 worker host 入口解析；其余七个 crate 只有骨架与职责文档，
-  CLI 只有 `--help` / `--version`。
+- 阶段：**workspace 骨架已落盘**，正在逐个 crate 填实现。根 `Cargo.toml` 集中管版本/依赖/lint；
+  CI 闸门清单以 `.github/workflows/ci.yml` 为准。
+- **本文件不记录瞬时状态**：门禁是否全绿、哪个 crate 写到什么程度、有哪些文件 —— 一律不写。
+  那些跑一次 `/gate`、看一眼目录列表与 `git status` 就知道，写进来只会变成过时的错误记忆。
 - 下一步：按 `rule://zcode-architecture` 的职责表逐个填实现；`crates/tui/` 的设计事实源是 `plans/tui/`。
 
 ## 命令
@@ -35,6 +34,7 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 | 要找什么                                              | 去哪                                                  |
 | ----------------------------------------------------- | ----------------------------------------------------- |
 | 行为红线（提交、装完成、验证义务）                    | `.omp/RULES.md` — always-apply，已在上下文里           |
+| 参考仓坐标与实现路由（三个真实仓库 + 线索表）        | `.omp/rules/reference-first.md`（`rule://reference-first`）— 写非平凡实现前必读，`/ref` 派调研 |
 | 通用 Rust 质量约束（错误、转换、可见性、异步、依赖）  | `rule://rust-quality`                                 |
 | 测试契约与并行安全                                    | `rule://rust-testing`                                 |
 | ZCode 特有构件约束（crate 边界、worker、prompt、TUI） | `rule://zcode-architecture`                           |
@@ -48,12 +48,21 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 一行一条：`<反引号路径>` — 职责 — 主要入口符号。只写**已存在**的路径；
 计划中的 crate 布局归 `rule://zcode-architecture`，不要提前搬进这里。
 
-- `crates/` — 九个 workspace 成员；职责表、导入边界、worker 契约见 `rule://zcode-architecture`。CLI 入口是 `crates/coding-agent`（包名 `zcode`），同时是所有 worker 的 host 二进制
+- `crates/` — 十个 workspace 成员；职责表、导入边界、worker 契约、**进程边界**见 `rule://zcode-architecture`。CLI 入口是 `crates/coding-agent`（包名 `zcode`），同时是所有 worker 的 host 二进制
+- `crates/protocol/` — 客户端 ↔ 运行时的唯一编译边界：wire 类型全归它，依赖方向 `tui -> protocol <- runtime`，两侧不得绕过它互相直连
+- `crates/utils/src/transport/` — 跨平台本机 IPC：Unix socket 与 Windows named pipe 包装成同名类型，上层零 `cfg`。`stream_pair()` 让 headless 与 TUI 共用同一个连接处理函数。不在此层做探活：Windows 上先探一次会占掉唯一 pipe 实例，随后的 connect 会卡在 `ERROR_PIPE_BUSY`
 - `crates/utils/src/env.rs` — worker 子进程重入 CLI 的路径解析：`declare_worker_host_entry` / `worker_host_entry`
+- `crates/ai/src/auth/store.rs` — 凭据文件落在用户主目录的 `.zcode` 下，`ZCODE_AUTH_FILE` 可覆盖；读-改-写全程持排他文件锁 + OAuth 刷新走 CAS。别退回"无锁整文件重写"：多进程并发刷新会丢轮换后的 refresh token
+- `crates/ai/src/http.rs` — 全 crate 唯一的 `reqwest` 客户端。TLS 走 `rustls-no-provider` + ring 并在建 Client 前装 provider：默认的 `rustls` feature 会拖进 aws-lc-sys（需 NASM/CMake）。同理不用 `dirs`（依赖 MPL-2.0 的 option-ext，被 `deny.toml` 挡）
+- `crates/catalog/src/models.json` — 生成物；源头、生成命令与可复现前提见 `rule://zcode-architecture`
+- `crates/catalog/src/effort.rs` — `Effort` 是 workspace 唯一的推理档位类型，`zcode-ai` 只 re-export；`Effort::Off` 的线上值是 `"none"`
+- `crates/text/src/width.rs`、`crates/text/src/truncate.rs`、`crates/text/src/path.rs` — 显示宽度 / 输出截断 / 路径脱敏的唯一实现，渲染点一律调它们；要求见 `rule://zcode-architecture` 的「TUI 输出清理」
+- `crates/schema/src/compile.rs` — JSON Schema 校验是 fail-closed：schema 形状非法或 `pattern` 编译不了都在 `compile` 期报错，绝不降级成跳过约束
 - `.github/workflows/ci.yml` — 闸门编排：fmt、三平台 clippy/test、cross-check（目标清单以该 workflow 为准）、MSRV（从 `rust-version` 读）、docs、deny、machete、index-guard
 - `.github/dependabot.yml` — cargo 与 actions 每周更新，次版本/补丁合并成一个 PR
 - `.config/nextest.toml` — nextest profile：`default`（本机）与 `ci`
 - `plans/tui/` — TUI 的调研与实施计划（架构、模块、平台、依赖、来源）；`crates/tui/` 的设计事实来源
+- `plans/runtime-boundary/` — 运行时与 UI 解耦的三仓调研原文 + 已裁决决策 + 分期实施计划；daemon 相关设计的事实来源
 - `.omp/` — agent 协作层：红线、领域规则、专用 subagent、slash 命令、索引守卫；分层理由见 `.omp/README.md`
 
 ## 完成定义
@@ -88,4 +97,4 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 **维护动作**：`/sync-index` 派 `index-keeper` 与代码对账，补新坐标并删过时条目。
 锚指向最后一次与索引对过账的 commit；`/sync-index` 负责推进它。
 
-<!-- index-verified: 7594a90 2026-08-06 -->
+<!-- index-verified: 2c7fa20 2026-08-06 -->

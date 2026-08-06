@@ -6,7 +6,7 @@ description: ZCode 特有构件约束：crate 职责与导入边界、worker 子
 
 ## Crate 职责表
 
-目标 workspace 由 9 个 crate 组成。九个 crate 目录均已落盘（只有 `zcode` 与 `zcode-utils` 有实现，其余暂为骨架）；表内其他路径仍标 `(planned)` 的，落盘后逐条删除标记，不要整表一次性摘掉。
+目标 workspace 由 10 个 crate 组成。十个 crate 目录均已落盘（`zcode`、`zcode-utils`、`zcode-protocol`、`zcode-schema`、`zcode-text`、`zcode-catalog` 有实现，其余暂为骨架）；表内其他路径仍标 `(planned)` 的，落盘后逐条删除标记，不要整表一次性摘掉。
 
 | Crate | 包名 | 职责 |
 | --- | --- | --- |
@@ -19,6 +19,54 @@ description: ZCode 特有构件约束：crate 职责与导入边界、worker 子
 | `crates/stats/` | `zcode-stats` | 本地可观测性仪表盘（`zcode stats`） |
 | `crates/schema/` | `zcode-schema` | JSON Schema 校验，惰性编译运行时 |
 | `crates/utils/` | `zcode-utils` | 共享工具（日志、流、临时文件、进程包装） |
+| `crates/protocol/` | `zcode-protocol` | 客户端与运行时之间的 wire 协议：版本/握手、信封、NDJSON 分帧、协议错误码 |
+
+## 进程边界：客户端 ↔ 运行时
+
+**决策已定**（调研证据与三仓对照见 `plans/runtime-boundary/`）：agent 运行时活在独立 daemon 进程，
+所有客户端（TUI、编辑器插件、移动端）跨进程连它。**别把"UI 秒开"当作 daemon 的理由**——
+opencode 文档明确否认这个因果（`packages/web/src/content/docs/server.mdx:57`），
+秒开来自客户端不做重活 + 第一帧先画，与传输形态无关。daemon 买到的是多端共享会话与
+agent 脱离 UI 存活。
+
+### 五条硬约束
+
+1. **`zcode-protocol` 是唯一编译边界。** 依赖方向 `tui -> protocol <- runtime`，
+   所有 wire 类型归 protocol 所有；领域类型与 wire 类型的互转是 host adapter 的职责。
+   **绝不**用 `pub use <runtime>::*` 整体转出来省 import——jcode
+   `crates/jcode-tui/src/lib.rs:23` 正是这么做的，代价是协议边界退化成自律，
+   且它的 CI 检查（`scripts/check_dependency_boundaries.py:26-51`）只护 `*-types` crate，看不见。
+2. **运行时 crate 绝不依赖 `ratatui` / `crossterm`。** jcode 的 `jcode-app-core` 依赖了
+   （`crates/jcode-app-core/Cargo.toml:73-75`），daemon 进程白扛渲染栈。
+3. **只有一条执行路径。** headless（`zcode -p`）与 TUI 共用同一套连接处理函数：daemon 在就连它，
+   不在就同进程自托管，用 `zcode_utils::transport::stream_pair()` 把自己接上去。
+   **绝不**为 headless 另开一条进程内直调路径——jcode 的 `jcode run`
+   （`src/cli/commands.rs:2362-2415`）就是反例，headless 的 MCP 冷缓存问题得单独打补丁 +
+   `JCODE_RUN_MCP_WAIT_MS` 兜底，而这个坑在统一路径下根本不存在。
+4. **进程内不付序列化成本。** 跨进程走 `zcode_utils::transport` + NDJSON；进程内直接传 `enum`
+   走 channel。opencode 的 Worker RPC 为了"和 HTTP 一致"把每个请求体整体字符串化
+   （`packages/opencode/src/util/rpc.ts:8`），不要抄。
+5. **未知变体：推送可丢，请求不可。** 常驻 daemon 必然遇到新旧混连。`Event` 一类推送用
+   internally tagged + `#[serde(other)]` 兜底静默跳过；**`Request` 绝不可跳过**——请求方在等
+   `reply_to` 指向自己 `id` 的那一帧，跳过等于让它永久挂着，必须回
+   `ErrorCode::UnsupportedRequest`。这个失败形状在 opencode 上有实证：权限询问的 pending
+   只在内存、重连不重拉，SSE 在 `permission.asked` 后断开则服务端工具永久挂着而 UI 无显示
+   （`packages/opencode/src/permission/index.ts:98-107`，重连路径
+   `packages/tui/src/context/sync.tsx:451-532` 无 `permission.list` 调用）。
+   规则本体与示例在 `crates/protocol/src/lib.rs` 与 `error.rs` 的模块文档里。
+
+### 落地时必须一起抄的东西
+
+缺一个就是一类 bug，全部坐标在 `plans/runtime-boundary/README.md` 第 7 节：
+
+- turn 属于 session scope 而非连接（否则 UI 一断 agent 就死，多端共享无从谈起）；
+- 取消三层：`InterruptSignal`（`AtomicBool` + epoch + `Notify`）+ 进程级 turn 注册表 +
+  cancel 请求优先于 Ack 分发。`CancellationToken` 不够用，理由是同一次取消要打到可能是多个
+  实例的信号上，且延时 reset 不能抹掉新 fire；
+- 权限审批走 oneshot-by-request-id 回环，且**重连后必须重拉 pending 列表**——
+  opencode 漏了这一步，后果是 SSE 在询问后断开则服务端工具永久挂着而 UI 无显示；
+- 解帧器四件套（已落在 `zcode-protocol` 的 `frame` 模块）；
+- 单实例锁 + 就绪握手 + 陈旧端点**双条件**回收（无活监听 **且** 能拿独占锁）。
 
 ## Catalog 导入边界
 
@@ -42,7 +90,7 @@ let child = Command::new(worker_host_entry()?)
 
 **历史缘由**（不得丢）：早期方案是每个 worker 声明独立 `[[bin]]` 目标，导致 `cargo install` 与打包脚本必须始终同步两套目标列表，漏掉一个就在安装后静默失败——这是为何所有 worker 现在统一走重入 CLI 入口这条路径。
 
-**Smoke probe 契约**：`zcode --smoke-test` 启动 stats sync worker 和 tiny-model 子进程，各发一次 ping 后退出，已接入 `ci:test:smoke` 和 `scripts/install-tests/run-ci.sh` (planned)，因此二进制安装、`cargo install --path` 安装、crate 包安装都会执行该验证。新 worker 若不在同一模块图上，必须补一个同级 smoke 测试，否则该验证覆盖不到它。
+**Smoke probe 契约（未落盘，落盘时按此设计）**：本仓目前**没有** `--smoke-test` flag、没有对应 CI job、没有 `scripts/install-tests/`。落盘时的目标是：`zcode --smoke-test` 逐个启动已注册的 worker 子进程，各发一次 ping 后退出，并接进 CI 与安装后验证，使二进制安装、`cargo install --path` 安装、crate 包安装都跑到这条路径。新 worker 若不在同一模块图上，必须补一个同级 smoke 测试，否则该验证覆盖不到它。
 
 ## Prompt 必须存静态 `.md`
 
@@ -50,14 +98,25 @@ let child = Command::new(worker_host_entry()?)
 
 ## 生成物禁改
 
-`crates/catalog/src/models.json` (planned) 由 `crates/catalog/build/generate_models.rs` (planned)（经 `cargo run -p zcode-catalog --bin gen-models` 调用）及 `crates/catalog/src/provider_models/` (planned) 下的描述符/解析器根据上游来源（stencil.so、提供商 catalog discovery、OpenCode 文档）生成，**绝不能手工编辑**，下次重新生成会覆盖手改内容。要改条目，改源头：
+`crates/catalog/src/models.json` 由 `crates/catalog/src/bin/gen_models.rs`（经
+`cargo run -p zcode-catalog --features gen --bin gen-models` 调用）从上游快照
+`https://catalog.stencil.so/models.json.zstd` 生成，**绝不能手工编辑**，下次重新生成会覆盖手改内容。
 
-- 解析规则 / 按 ID 覆盖 → `crates/catalog/src/provider_models/openai_compat.rs` (planned) 中的解析器（如 `create_opencode_api_resolution` 的 ID 覆盖映射）。
-- 提供商 catalog 条目（默认模型、discovery factory/flag）→ `crates/catalog/src/provider_models/descriptors.rs` (planned) 的 `CATALOG_PROVIDERS` 表。
-- 生成器级修正（premium multiplier、Codex 定价 fallback、fallback 模型、后处理）→ `crates/catalog/src/bin/gen_models.rs` (planned)。
-- 思考元数据 / 生成策略 → `crates/catalog/src/model_thinking.rs` (planned)（`apply_generated_model_policies`）；模型 ID 分类（family/version 解析）→ `crates/catalog/src/identity/classify.rs` (planned)。
+生成器**只读这一个公开只读 URL**：不读本机凭据、不发带 key 的 discovery 请求。因此同一份上游快照在
+任何机器上产出的字节完全一致（容器一律 `BTreeMap`、字段顺序由结构体声明顺序固定）。
+oh-my-pi 的生成器读 env + 本机 `agent.db` 再发真实请求，导致不同机器产出不同的 `models.json`
+（`packages/catalog/scripts/generate-models.ts:80-113`）——那是债，本仓不继承。要改条目，改源头：
 
-改完用 `cargo run -p zcode-catalog --bin gen-models` 重新生成，把 `models.json` (planned) 与源码修改一并提交。回归测试要打在**解析器/描述符**上，不要打在内置 JSON 上，这样上游元数据变化后测试仍然有效。
+- 磁盘契约（字段增删、序列化形态）→ `crates/catalog/src/spec.rs`，生成器与运行时共用同一套类型。
+- 上游 → 本仓的字段映射、模态与状态白名单、`0` 视作未知的归一 → `crates/catalog/src/bin/gen_models.rs`。
+- 提供商描述符（base URL、环境变量、默认模型、discovery、线格式）→ `crates/catalog/src/descriptors.rs`。
+  该文件的测试会断言每条非 `discovery_only` 的 id 与 `default_model` 在 `models.json` 里真实存在——
+  上游的描述符表与生成物已经漂移且用不安全 cast 掩盖，缺的正是这个一致性检查，不要删掉它。
+- 思考元数据 / effort ladder → `crates/catalog/src/thinking.rs`；模型 ID 分类（family/version 解析）
+  → `crates/catalog/src/identity/classify.rs`。
+
+改完重新生成，把 `models.json` 与源码修改一并提交。回归测试要打在**描述符与解析函数**上，
+不要打在内置 JSON 的具体条目上，这样上游元数据变化后测试仍然有效。
 
 ## 中央工具函数优先
 
@@ -69,19 +128,29 @@ let child = Command::new(worker_host_entry()?)
 
 ## TUI 输出清理
 
-所有显示在工具渲染器中的文本必须清理：制表符会造成视觉空洞，长行会溢出，路径会泄露用户主目录。
+清洗能力的**唯一实现落点是 `zcode-text`**，不是 `zcode-tui`：`width`（显示宽度、按宽度截断、
+换行、制表符展开、ANSI 剥离、控制字符清洗）、`truncate`（行/字节/列三维截断与 `OutputSink`）、
+`path::shorten_path`（主目录 → `~`）。渲染代码一律调它们，**绝不在渲染点另写一份**。
 
-- 制表符 → 空格：`replace_tabs()`。
-- 截断：`truncate_to_width()` / `ui::truncate()`，用 `TRUNCATE_LENGTHS` 常量。
-- 缩短路径：`shorten_path()`，把主目录替换为 `~`。
-- 预览限制：统一用 `PREVIEW_LIMITS`，不得临时硬编码数字。
-- 宽度计算：一律经 `unicode-width`，绝不用 `str::len()`。
+要求：
 
-这些规则必须应用到**每一条渲染路径**，不只是成功路径：成功输出（文件预览、命令输出、搜索结果）、**错误消息**（patch 失败消息常带未匹配的原始行，含文件内容就必须过 `replace_tabs()`）、diff 内容（新增/删除两侧）、流式预览。
+- 制表符按列展开成空格（`width::expand_tabs`）——制表符在等宽网格里会造成视觉空洞；
+- 长行按**显示宽度**截断（`width::truncate_to_width` / `truncate::cap_columns`），
+  绝不用 `str::len()` 或 `chars().count()`。上游同一个 512 喂给两套实现——native 侧按字节、
+  JS 侧按字符——CJK 下截断位置差三倍；本仓只有一套，按显示宽度；
+- 多码点 grapheme 簇整簇交给 `unicode-width` 求宽，不得逐字符求和（否则 ZWJ 家庭 emoji 算 8 列，
+  实际 2 列，jcode `crates/jcode-tui/src/tui/ui/display_width.rs:1-19` 就是反例）；
+- 路径显示走 `path::shorten_path`，不泄露用户目录；Windows 大小写不敏感由它内部处理；
+- 预览行数 / 条目数走 `truncate::TruncateLimits` 的统一常量，不得在渲染点硬编码数字；
+- 以上适用于**每一条渲染路径**，不只是成功路径：错误消息（patch 失败消息常带未匹配的原始文件行）、
+  diff 的新增与删除两侧、流式预览，都要过同一套清理。
 
-**流式工具预览的多路径陷阱**：工具调用预览存在多条渲染路径——实时事件路径和 transcript 重建路径都要走 `decode_streamed_tool_args` / `ToolArgsRevealController`（`modes/controllers/tool_args_reveal.rs` (planned)）解码显示参数，绝不能把提供商已解析的 `arguments` 与原始 `partial_json` 并列展开（已解析参数受节流解析窗口影响，会滞后于流）。新增仅用于预览的字段或依赖部分流式参数时，必须同步更新所有路径，不能只改最终渲染器。
-
-对 bash 工具尤其要注意：待执行预览可能需要原始 `partial_json` 而非已解析的 `arguments`——已解析参数要等到 JSON 对象闭合才会出现，内联环境变量赋值可能到最后一刻才可见。仅用于预览的字段必须贯穿 `event_controller.rs` (planned)、`ui_helpers.rs` (planned) 中的 transcript 重建，以及 `tool_execution.rs` (planned) 中合并后的调用/结果渲染，遗漏任一条都会导致预览不一致；`ToolExecutionComponent::build_render_context()` 必须在结果为 `None` 时也能工作。每次改动 bash 预览，都要同时验证实时流式路径和重建 transcript 路径——只修一条不算修好。
+**流式预览的多路径陷阱**（oh-my-pi 的实战教训，落盘时照此设计）：工具调用预览通常存在
+实时事件与 transcript 重建两条渲染路径，两条必须共用同一个解码器；不能把提供商已解析的参数
+与原始 partial JSON 并列展开——已解析参数受节流解析窗口影响，会滞后于流
+（`packages/coding-agent/src/modes/controllers/tool-args-reveal.ts:10-14,433-437`）。
+bash 的待执行预览尤其需要原始 partial JSON：内联环境变量赋值可能要到 JSON 对象闭合前一刻才可见。
+新增仅用于预览的字段时，所有渲染路径必须同步更新；只修一条不算修好，两条路径都要实测。
 
 ## 日志与 CLI 输出边界
 

@@ -15,3 +15,25 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+async-trait.workspace = true
+base64.workspace = true
+bytes.workspace = true
+futures-core.workspace = true
+futures-util.workspace = true
+getrandom.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+webbrowser.workspace = true
+zcode-catalog.workspace = true
+
+[dev-dependencies]
+mockito.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "test-util"] }

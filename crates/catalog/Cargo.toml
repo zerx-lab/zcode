@@ -14,4 +14,28 @@ categories.workspace = true
 [lints]
 workspace = true
 
+[features]
+# 生成 `src/models.json` 的离线工具链。默认关闭：库消费者不该为一个构建期工具
+# 拖进 reqwest/rustls/tokio/zstd 四棵依赖树。
+gen = ["dep:anyhow", "dep:reqwest", "dep:rustls", "dep:tokio", "dep:zstd"]
+
+[[bin]]
+name = "gen-models"
+path = "src/bin/gen_models.rs"
+required-features = ["gen"]
+
 [dependencies]
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+anyhow = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["rt-multi-thread"] }
+zstd = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
