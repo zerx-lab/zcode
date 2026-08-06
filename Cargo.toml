@@ -112,7 +112,7 @@ tracing = "0.1"
 url = "2.5"
 webbrowser = "1.2"
 # 自己启用 ENABLE_VIRTUAL_TERMINAL_PROCESSING，不经 crossterm 的 supports_ansi()。
-windows-sys = { version = "0.60", features = [
+windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_System_Console",
 ] }
