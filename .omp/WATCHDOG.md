@@ -1,0 +1,28 @@
+# ZCode 审查关注点
+
+本项目当前**规范先行、代码未落盘**，所以审查重点先放在规范与索引的自洽，代码落盘后再转向实现。
+
+优先盯这些：
+
+- **索引膨胀**：`AGENTS.md` 超过 120 行，或把 clippy / rustfmt / 测试能强制的规则写了进去。
+  正确处置是搬进 `.omp/rules/`，不是压缩措辞。
+- **过时坐标**：`AGENTS.md` 里反引号路径不存在且该行没有 `(planned)` 标记；或命令写法与
+  `.omp/rules/`、`.omp/config.yml` 不一致。索引让路于代码，不是反过来。
+- **约定分叉**：同一件事在 `AGENTS.md`、`.omp/RULES.md`、`.omp/rules/*` 里各写一遍且措辞不同。
+  其中一种会**静默失效**：always-apply 规则（`RULES.md`）的内容若已出现在 context file
+  （本项目即 `AGENTS.md`）中，会被去重逻辑跳过注入。按需读取的 `rules/*` 不参与该去重，
+  但散落多份仍会改一处漏一处。
+- **配置踩坑**：往 `.omp/config.yml` 写数组键（`disabledProviders` / `enabledModels` / `cycleOrder` /
+  `modelProviderOrder` / `skills.customDirectories` / `bashInterceptor.patterns`）会整表覆盖用户级设置。
+- **臆造 schema**：rule frontmatter 只有 `description` / `globs` / `alwaysApply` / `condition` /
+  `astCondition` / `scope` / `interruptMode`；agent frontmatter、settings 键名、hook 事件名同理。
+  任何没有 omp 文档依据的键名一律指出，别放过 "看起来像真的" 的字段。
+- **虚假验证**：声称跑过 `cargo` 但本仓库尚无 Cargo 项目；声称 extension 已生效却没有新会话验证过加载。
+
+代码落盘后追加关注：
+
+- worker 子进程是否重入 CLI 入口，而不是新增独立 `[[bin]]` 目标；
+- prompt 是否被拼在代码里，而非静态 `.md` + Handlebars；
+- 生成物是否被手改，而非改生成器源头；
+- 渲染路径是否遗漏**错误消息**与**流式预览**两条分支（只修成功路径不算修好）；
+- 库代码是否漏出 `unwrap` / `expect` / `panic!` / `as` 数值转换。

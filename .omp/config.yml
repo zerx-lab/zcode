@@ -1,0 +1,37 @@
+# ZCode 项目级 omp 配置（可提交 git）
+#
+# 合并顺序（低 → 高）：内置默认 ← ~/.omp/agent/config.yml ← 本文件 ← --config ← 运行时开关。
+# 对象深合并，**标量与数组整层替换**。
+#
+# 因此本文件刻意不写任何数组键：
+#   disabledProviders / enabledModels / cycleOrder / modelProviderOrder /
+#   skills.customDirectories / bashInterceptor.patterns
+# 写了会把用户级同名数组整表覆盖 —— 例如把用户已禁用的 discovery provider 重新放出来。
+#
+# 同理不写 tools.approvalMode、theme、modelRoles：那些是使用者的人机偏好，不是项目属性。
+#
+# 项目发现不向上走祖先目录：必须在含本 .omp/ 的目录启动 omp，配置才生效。
+
+lsp:
+  # 编辑 .rs 后立即跑 rust-analyzer 诊断，错误当轮进 agent 循环，不必等到 cargo check。
+  # 默认 false（写入后诊断 diagnosticsOnWrite 默认已是 true）。
+  diagnosticsOnEdit: true
+
+bash:
+  # 有序列表，首个匹配生效。这里只放 deny/prompt 护栏，
+  # 故意不写 `match: "*"` 兜底 —— 未匹配的命令继续走使用者自己的 approvalMode。
+  patterns:
+    - match: "cargo publish*"
+      approval: deny
+    - match: "cargo owner*"
+      approval: deny
+    - match: "cargo yank*"
+      approval: deny
+    - match: "git push --force*"
+      approval: deny
+    - match: "git push -f*"
+      approval: deny
+    - match: "git reset --hard*"
+      approval: prompt
+    - match: "git clean -fd*"
+      approval: prompt

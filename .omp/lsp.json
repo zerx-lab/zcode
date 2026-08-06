@@ -1,0 +1,20 @@
+{
+  "idleTimeoutMs": 600000,
+  "servers": {
+    "rust-analyzer": {
+      "capabilities": {
+        "flycheck": true,
+        "expandMacro": true,
+        "runnables": true,
+        "relatedTests": true,
+        "ssr": true
+      },
+      "workspaceReadyTimings": {
+        "timeoutMs": 60000,
+        "pollMs": 250,
+        "settleMs": 2000,
+        "statusRequestTimeoutMs": 2000
+      }
+    }
+  }
+}
