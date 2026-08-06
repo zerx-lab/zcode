@@ -62,7 +62,7 @@ pub const SYSTEM_OVERHEAD_TOKENS: u64 = 18_000;
 /// `f32`）。**上游没有给出 0.80 这个数字的依据**，本仓原样沿用，待用真实会话样本实测修正。
 ///
 /// 这个常量只用于对外展示 / 文档；[`ContextBudget::threshold`] 的实际计算走
-/// [`COMPACTION_THRESHOLD_PERCENT`]（整数百分比），避免 `f64 -> u64` 需要被 lint 禁掉的
+/// `COMPACTION_THRESHOLD_PERCENT`（整数百分比），避免 `f64 -> u64` 需要被 lint 禁掉的
 /// `as` 转换。两者保持同步由 `tests::threshold_percent_constants_match_f64_constants` 断言。
 pub const COMPACTION_THRESHOLD: f64 = 0.80;
 
@@ -74,7 +74,7 @@ pub const CRITICAL_THRESHOLD: f64 = 0.95;
 /// 整数运算，不必把 `f64` 转回 `u64`。
 const COMPACTION_THRESHOLD_PERCENT: u64 = 80;
 
-/// [`CRITICAL_THRESHOLD`] 的整数百分比形式，用途同 [`COMPACTION_THRESHOLD_PERCENT`]。
+/// [`CRITICAL_THRESHOLD`] 的整数百分比形式，用途同 `COMPACTION_THRESHOLD_PERCENT`。
 const CRITICAL_THRESHOLD_PERCENT: u64 = 95;
 
 /// 保留的最近消息数（jcode 命名为"turn"，但上游实现里就是按消息数而非语义轮次计数，
@@ -101,7 +101,7 @@ pub struct ContextBudget {
 }
 
 impl ContextBudget {
-    /// 从模型 id 查内置目录拿上下文窗口容量；查不到时用 [`DEFAULT_CONTEXT_WINDOW`] 兜底。
+    /// 从模型 id 查内置目录拿上下文窗口容量；查不到时用 `DEFAULT_CONTEXT_WINDOW` 兜底。
     ///
     /// 只有模型 id、没有 provider id，因此走
     /// [`zcode_catalog::models::BundledCatalog::find_model_everywhere`]——它会解析全部
@@ -364,7 +364,7 @@ fn safe_cutoff(records: &[MessageRecord], initial_cutoff: usize) -> Option<usize
 ///
 /// `occupied` 是 [`effective_context_tokens`] 算出的占用值。未达
 /// [`ContextBudget::threshold`] 不压缩；达到后，初始切点取"倒数第
-/// [`RECENT_TURNS_TO_KEEP`] 条消息"，再交给 [`safe_cutoff`] 调整到不撕裂工具配对的
+/// [`RECENT_TURNS_TO_KEEP`] 条消息"，再交给 `safe_cutoff` 调整到不撕裂工具配对的
 /// 位置。调整后的切点等于 0（意味着连一条消息都摘要不了）或者根本找不到安全切点，
 /// 都视为"这次不压"——宁可让上下文继续增长，也不生成一份会让下一次请求 400 的
 /// 保留段（jcode `safe_compaction_cutoff` 同策：找不到就返回等价于不切的值）。

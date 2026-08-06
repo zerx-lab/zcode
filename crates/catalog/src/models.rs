@@ -11,13 +11,13 @@
 //! 本模块因此做两级惰性，而不是一次性 `serde_json::from_str::<CatalogFile>`：
 //!
 //! 1. **顶层索引**：把 `models.json` 解析成
-//!    `HashMap<Box<str>, &'static RawValue>`（[`RAW_INDEX`]）。`RawValue`
+//!    `HashMap<Box<str>, &'static RawValue>`（`RAW_INDEX`）。`RawValue`
 //!    只记录每个 provider 子树在原始字符串里的起止范围，不构造任何
 //!    `ProviderSpec`/`ModelSpec`；这一步只做一次，且只需要识别 JSON 对象的
 //!    键和大括号配对，不需要理解 6149 个 model 各自的字段。
 //! 2. **按 provider 解析**：某个 provider 第一次被 [`BundledCatalog::provider`]
 //!    访问时，才把它的原始子串 `serde_json::from_str::<ProviderSpec>`，结果
-//!    存进 [`PARSED`]（`RwLock<HashMap<Box<str>, Arc<ProviderSpec>>>`）。此后
+//!    存进 `PARSED`（`RwLock<HashMap<Box<str>, Arc<ProviderSpec>>>`）。此后
 //!    同一个 id 的每次访问都直接命中缓存、复用同一个 `Arc`。
 //!
 //! 代价：[`BundledCatalog::find_model_everywhere`] 需要跨 provider 搜索，会
@@ -257,7 +257,7 @@ pub enum CacheRetention {
 /// 真实成本，整个函数返回 `None`，而不是悄悄按 0 计——那会让已经发生的缓存开销
 /// 在账单里凭空消失。
 ///
-/// `context_tokens` 超过 [`LONG_CONTEXT_THRESHOLD_TOKENS`] 且该模型提供了
+/// `context_tokens` 超过 `LONG_CONTEXT_THRESHOLD_TOKENS` 且该模型提供了
 /// `cost.context_over_200k` 时，`input`/`output`/`cache_read`/`cache_write`
 /// 四项单价整体切换为阶梯单价；阶梯里缺失的缓存单价（上游常常只给阶梯的
 /// `input`/`output`，不重复给缓存价）回退到基础单价，回退后仍缺失则按上一段

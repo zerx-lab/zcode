@@ -3,6 +3,9 @@
 格式与归属标注规则见 `rule://zcode-workflow`。
 
 ## [Unreleased]
+### Breaking Changes
+
+- 项目许可证从 `MIT OR Apache-2.0` 切换为 `AGPL-3.0-only`。
 
 ### Added
 
@@ -38,3 +41,9 @@
   故在解码前按 `MAX_PIXELS` 拒绝，并用 `ImageReader::limits` 的 `max_alloc` 作第二道防线。
 - **尺度梯地板是 `min_dimension`（200px），不是上游的 100px。** 上游自己论证了 <200px 会被
   vision 后端硬拒并污染整个请求，却把地板设在 100px，两处未协调。
+
+### Fixed
+
+- rustdoc 在 `-D warnings` 下报的文档链接问题：`image.rs` / `width.rs` 中指向私有
+  `MAX_INPUT_BYTES` / `MAX_PIXELS` / `grapheme_width` 等项的 intra-doc 链接降级为代码 span；
+  `lib.rs` 模块表里的 `grep` 用 `[mod@grep]` 消歧（它同时是模块与被 glob 再导出的函数）。

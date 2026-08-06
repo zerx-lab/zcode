@@ -3,6 +3,9 @@
 格式与归属标注规则见 `rule://zcode-workflow`。
 
 ## [Unreleased]
+### Breaking Changes
+
+- 项目许可证从 `MIT OR Apache-2.0` 切换为 `AGPL-3.0-only`。
 
 ### Added
 
@@ -46,3 +49,9 @@
 - **headers 永不落盘**，且从类型签名上就没有接受 header 的入口：自定义提供商可用任意
   header 名承载凭据，没有基于名字的过滤能做到完备。
 - `CACHE_TTL = 2h` 沿用上游取值，但上游未给出前提（无 bench、无 issue），本仓亦未实测。
+
+### Fixed
+
+- rustdoc 在 `-D warnings` 下报的文档链接问题：`cache.rs` / `manager.rs` / `models.rs` /
+  `thinking.rs` 中指向私有项（`SCHEMA_VERSION`、`merge_known`、`RAW_INDEX`、`PARSED`、
+  `LONG_CONTEXT_THRESHOLD_TOKENS`、`Self::OFF_ROUTING_INDEX`）的 intra-doc 链接降级为代码 span。

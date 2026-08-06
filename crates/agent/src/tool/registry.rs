@@ -121,7 +121,7 @@ impl ToolRegistry {
             .map_err(|error| render_validation_error(name, &error, args))
     }
 
-    /// 未知工具名的推荐（最多 [`MAX_SUGGESTIONS`] 个）。
+    /// 未知工具名的推荐（最多 `MAX_SUGGESTIONS` 个）。
     ///
     /// 三级启发式打分，抄源 jcode `crates/jcode-app-core/src/tool/mod.rs:378-416`
     /// （`closest_tool_names`，issue #104：阻断模型在幻觉工具名上反复打转）：
@@ -131,7 +131,7 @@ impl ToolRegistry {
     /// 3. 有界 Levenshtein 编辑距离（分数 `3 + 距离`），阈值 `max(较长名字长度 / 3, 2)`——
     ///    只推荐"看起来像"的名字，完全不相干的候选距离必然超阈值，直接被过滤掉。
     ///
-    /// 结果先按分数、分数相同再按字典序排序，取前 [`MAX_SUGGESTIONS`] 个。
+    /// 结果先按分数、分数相同再按字典序排序，取前 `MAX_SUGGESTIONS` 个。
     #[must_use]
     pub fn suggestions(&self, name: &str) -> Vec<&str> {
         let needle = name.trim().to_ascii_lowercase();

@@ -7,8 +7,10 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.92"
-license = "MIT OR Apache-2.0"
+# 实际下限由依赖决定：libsqlite3-sys 0.38 的 build.rs 用 `cfg_select!`（Rust 1.95 稳定），
+# 且它自己没声明 rust-version，Cargo 拦不住——降回 1.92 会让 MSRV job 直接编译失败。
+rust-version = "1.95"
+license = "AGPL-3.0-only"
 repository = "https://github.com/zerx-lab/zcode"
 homepage = "https://github.com/zerx-lab/zcode"
 authors = ["zerx-lab"]
@@ -42,6 +44,8 @@ futures-util = { version = "0.3", default-features = false, features = ["std"] }
 getrandom = "0.4"
 grep-regex = "0.1"
 grep-searcher = "0.1"
+# HMAC-SHA256：daemon 端点握手的双向挑战应答。不自己拼 ipad/opad——那是能静默出错的地方。
+hmac = "0.13"
 ignore = "0.4"
 # 只开我们真正解码/编码的格式：默认 feature 会拖进 avif/exr/tiff 等一大票编解码器。
 image = { version = "0.25", default-features = false, features = [

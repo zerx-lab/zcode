@@ -49,7 +49,7 @@ fn next_stamp() -> u64 {
 }
 
 /// 当前 Unix 毫秒。时钟早于纪元（只可能是系统时钟被手工设坏）时取 0——
-/// 单调性由 [`next_stamp`] 的"上一个 + 1"分支兜底，不依赖系统时钟正确。
+/// 单调性由 `next_stamp` 的"上一个 + 1"分支兜底，不依赖系统时钟正确。
 #[must_use]
 pub fn now_millis() -> u64 {
     SystemTime::now()

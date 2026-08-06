@@ -185,7 +185,7 @@ impl ThinkingConfig {
     }
 
     /// 批量设置线上模型 id 路由。`key = None` 写入专用的“关闭”槽位（见
-    /// [`Self::OFF_ROUTING_INDEX`]），`key = Some(effort)` 写入该具体阶梯
+    /// `Self::OFF_ROUTING_INDEX`），`key = Some(effort)` 写入该具体阶梯
     /// 档位的按档覆写。
     #[must_use]
     pub fn with_effort_routing(

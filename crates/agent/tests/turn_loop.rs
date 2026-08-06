@@ -259,6 +259,7 @@ async fn build_with(
         provider,
         Arc::new(registry),
         store,
+        Arc::new(zcode_agent::cancel::CancelRegistry::new()),
         TurnConfig {
             approval_mode,
             ..TurnConfig::default()

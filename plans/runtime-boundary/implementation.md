@@ -12,6 +12,12 @@
 | 帧信封 | `crates/protocol/src/envelope.rs` | 5 用例：推送省略 `reply_to`、回应携带请求 id、缺字段解为 `None`、`map` 保留信封、id 从 1 递增 |
 | 协议错误码 | `crates/protocol/src/error.rs` | 4 用例：snake_case 往返、未知错误码被吸收、`VersionMismatch` 转错误帧、unsupported 带请求名 |
 | NDJSON 分帧 | `crates/protocol/src/frame.rs` | 9 用例：往返、逐字节跨 chunk 组帧、心跳空行跳过、坏行只跳该行、结构不符不挂起、超限报错、上限针对累积字节、大帧后容量回缩、`buffered` 计数 |
+| wire 变体 | `crates/protocol/src/wire/`（`types.rs` / `request.rs` / `event.rs` / `mod.rs`） | 单元测试 + `tests/wire_schema.rs` 形状快照（16 Request / 10 Reply / 19 Event，穷尽性哨兵双保险） |
+| 双向握手 | `crates/protocol/src/version.rs`（`ClientHello` / `ServerHello` / `ClientAuth`） | 3 帧往返 + "客户端首帧不含凭据"断言 |
+| 取消注册表与级联 | `crates/agent/src/cancel.rs` | 7 用例：多 turn 扇出、会话隔离、守卫复位、子会话递归、深链多轮、取消期间新增作业（cfg(test) pass hook）、同信号只 fire 一次 |
+| stdin 回环 | `crates/agent/src/stdin.rs` | 7 用例：问答回环、重复回答、`cancel_all` 解挂、pending 清空、并发不串担 |
+| daemon 端点原语 | `crates/utils/src/daemon.rs` | Windows 真机 10 用例：证明域分隔/nonce 绑定、密钥不进日志、注册文件原子往返、只删自己那份、锁互斥、活端点不回收、死端点回收、就绪令牌校验、子进程早死报错 |
+| 依赖方向 ratchet | `.omp/checks/dep-boundary.check.ts` + CI `dep-boundary` job | 正反两跑：干净仓库 exit 0；临时给 `zcode-tui` 加 `zcode-agent` 依赖 exit 1 |
 
 `crate::transport` 的 cfg 类型别名抄源 jcode `crates/jcode-base/src/transport/mod.rs:1-8` +
 `unix.rs:1-19` + `windows.rs:11-116`；`stream_pair` 的用途抄源 `gateway.rs:211-220`。
@@ -26,64 +32,49 @@
 | Windows `Listener::bind` 用 `first_pipe_instance(true)` | bind 本身就成为单实例互斥。Unix 侧没有这个性质，需要额外 lock 文件——差异写在模块文档里，避免上层误以为两平台等价 |
 | 未知 `Request` 必须回 `UnsupportedRequest` | jcode 的兜底规则只写给 event（`crates/jcode-harness-api/src/events.rs:113-115`）。请求侧照抄会让 `reply_to` 的等待方永久挂着 |
 
+## 第 1 期已完成：落地时相对本计划的偏离
+
+变体、握手、取消级联、daemon 原语已全部落盘（见"已落地"表）。下面逐条记录**与本文档原先
+写法不一致的地方**，以及为什么改——不要按旧写法回改代码。
+
+| 计划原写法 | 实际落地 | 理由 |
+|---|---|---|
+| `Request::PermissionReply` / `Event::PermissionAsked` / `Request::PermissionList` | `Request::ApprovalRespond` / `Event::ApprovalRequested` / `Request::PendingList` | 词汇随已落盘的领域层（`crates/agent/src/approval.rs` 的 `ApprovalGate` / `ApprovalReply` / `PendingApproval`），本文档 `:57-59` 自己也指定按那里映射；再引入一套 `Permission*` 就是与既有约定并行的第二套写法。`PendingList` 同时返回审批与 stdin 两类待回答项：它们是同一个失败模式（待回答状态挂在连接上），重连一次往返取齐比两条路径少一个"忘了调"的机会。**能力一条不少**：重连必须能重拉待审批，这条由 `PendingList` 与 `Reply::Subscribed.pending` 双路保证 |
+| `Subscribe` 带 `client_has_local_history=true` | `Subscribe { client, has_local_history, takeover, since }` | jcode 那个布尔在 server 侧只当 takeover 授权凭证、并不裁剪 History 载荷（`server/client_session.rs:1343-1356`）。本仓把两件事拆开：三元判据管仲裁，`since` 游标管载荷 |
+| 握手沿用 `Hello`（仅版本协商） | 三帧双向挑战应答 + `ErrorCode::Unauthorized` | Windows named pipe 没有文件权限模型，任何本机进程都能抢名占坑；明文 bearer 一次连接就被收走，占坑者随后既能冒充 daemon 也能去连真 daemon。让服务端先证明持有密钥，占坑者在第二帧被识破 |
+| 就绪握手用父子 pipe（`JCODE_READY_FD`） | `ReadyChannel`：`transport` 上的一次性带令牌端点 | 语义等价（与本次 spawn 一一绑定），但跨平台且无 `unsafe`；jcode 那条路径整段 `#[cfg(unix)]`，Windows 侧只能退化成轮询 |
+| 取消注册表照抄 jcode 的进程级 `static` | 可持有的 `CancelRegistry` 对象 | jcode 自己记了代价：同名 session 的测试无法并行。另外本表**登记后台作业**并沿子会话递归，jcode 只登记 turn |
+| 后台作业级联"循环到无新增" | 同上，外加 64 轮安全阀 + `CancelReport::cascade_exhausted` | 无界循环在取消路径上会变活锁。触顶时 runner **照打**（它是新作业的唯一来源），但报告标志告诉调用方这次取消不干净 |
+
+仍然按计划落地、未打折的部分：`Event::Resync`（慢消费者不断流）、stdin 回环与审批共用一套
+"挂在 session 上"的机制、`always` 连锁 / `reject` 连坐 / 每次结算都广播、
+未知 `Event` 静默跳过而未知 `Request` 必回 `UnsupportedRequest`。
+
 ## 待落地
-
-### 第 1 期：Request / Event 变体
-
-**前置条件**：`zcode-agent` 的运行时形状（session、turn、tool call、权限询问）落盘。
-现在写变体是凭空发明——没有领域类型可映射。
-
-变体归 `zcode-protocol` 所有，host adapter 负责与领域类型互转。形状参考
-jcode `crates/jcode-protocol/src/wire.rs`（`Request` ~68 变体 / `ServerEvent` ~79 变体），
-但**不要**照搬规模：jcode 自陈其内部协议 "unversioned, TUI-shaped, coupled to client rendering
-assumptions"（`docs/HARNESS_API_AND_DESKTOP_REWRITE.md:5-10`），于是又叠了一层 v1 facade。
-本仓从零起步，只要一套版本化协议。
-
-必须包含且容易漏的：
-
-- **权限审批**：`Request::PermissionReply` / `Event::PermissionAsked` +
-  **`Request::PermissionList`（重连必调）**。opencode 有前两条、漏了第三条，后果是 SSE
-  在询问后断开则服务端工具永久挂着而 UI 无显示。
-
-  **裁决变更（用户拍板）**：规则模型**不用** opencode 的有序 allow/deny/ask ruleset，
-  改用 oh-my-pi 的 **tier × policy**（`packages/coding-agent/src/tools/approval.ts:29-185`），
-  默认模式 `yolo`。理由：ruleset 表达力更强但默认 `ask`，开箱即用每个工具都弹窗；
-  本仓面向单人 power-user。已落地在 `crates/agent/src/approval.rs`，
-  wire 变体按那里的 `Tier` / `Policy` / `ApprovalMode` / `ApprovalReply` 映射，
-  **不要再实现一套 ruleset**。
-
-  **回环语义仍照抄 opencode**（`packages/opencode/src/permission/index.ts:98-167`）：
-  oneshot-by-request-id、`always` 连锁放行同作用域的其余 pending、`reject` 连坐、
-  每次结算都推 replied 让所有客户端同步移除 UI。与上游的差异是 `always` 的键是
-  `(工具名, 工具声明的作用域)` 而非 `permission + patterns`——本仓没有 pattern 维度，
-  作用域由工具自己收窄（`bash` 可返回 `bash:git`）。
-- **stdin 回环**：工具执行中要用户输入时的 oneshot-by-request-id
-  （jcode `server/client_lifecycle.rs:633-666` + `wire.rs:347-356`）。这与权限审批是同一个机制。
-- **`Event::Resync`**：`broadcast` 慢消费者 `RecvError::Lagged` 时**不断流**，
-  推 resync 让客户端按游标补拉。这是对 opencode 两代都错的直接修正
-  （v1 `Queue.unbounded` 撑爆 server、v2 `dropping(256)` 溢出即打挂整条流）。
 
 ### 第 2 期：连接处理与 daemon 生命周期
 
+**原语已全部落盘**（取消三层、级联、注册文件、单实例锁、双条件回收、就绪握手、握手证明），
+见"已落地"表。剩下的都是**装配**，归 `crates/coding-agent`：
+
 - `handle_client`：每 client 一个出站 forwarder；**cancel 请求先于 Ack 分发**
   （jcode `server/client_lifecycle.rs:946-988`——共享 writer 忙时取消会排在出站字节后面）。
-- 取消三层：`InterruptSignal`（`AtomicBool` + epoch + `Notify`）+ 进程级 turn 注册表
-  （jcode `crates/jcode-agent-runtime/src/lib.rs:30-115` + `turn_cancel_registry.rs:3-24`）。
-  三个非平凡点：`notified()` 先 `enable()` 再查 flag（丢一次 wakeup 会把取消挂到下一个无关事件）；
-  延时 reset 必须 epoch-guarded；`Drop` 里必须 `reset()`，否则残留 flag 瞬间中止下一个 turn。
-- 取消级联到后台作业：递归取消所有指向本 session 的 job，循环到无新增，再取消 runner
-  （opencode `packages/opencode/src/session/run-state.ts:108-140`）。
-- daemon 生命周期：注册文件（原子 temp+rename、0600）+ 健康认证 + 版本比对 + 自杀式互斥
-  （opencode `packages/cli/src/services/daemon.ts:40-41,64-78,110-131,159-177`）。
-  **先健康认证再对 PID 发信号**，PID 会被复用（注释 `:152-153`）。
-  就绪握手用父子 pipe（jcode `JCODE_READY_FD`，`server/socket.rs:229-274`），
-  **不要**靠 stdout 文本匹配（opencode `packages/sdk/js/src/v2/server.ts:55-70` 的反例）。
-- 陈旧端点回收**双条件**：无活监听 **且** 能拿到独占锁（jcode `server/socket.rs:88-137`）。
-  单条件会删掉活着的接任者。
-- 接管仲裁三元判据：takeover flag + 客户端本地历史 + client 实例 id
-  （jcode `server/client_session.rs:1264-1265,1417-1418,1485-1490`）。
-- Windows 主线程栈设 8 MiB（jcode `src/main.rs:76-80`：Windows 默认栈比 Unix 小，
-  provider setup 会 `STATUS_STACK_OVERFLOW`）。
+  取消动作调 `zcode_agent::cancel::CancelRegistry::cancel_session`，三层与级联它已经做完了。
+- session 表：`SessionId -> AgentRuntime`，加上把 `AgentEvent` 翻成 `wire::Event` 的
+  host adapter（领域类型 ↔ wire 类型的互转在这里，两侧都不许绕过 `zcode-protocol`）。
+- daemon 生命周期编排：`SingleInstanceLock::acquire` → `reap_stale_endpoint` → `Listener::bind`
+  → `Registration::write_atomic` → `signal_ready`。**顺序不可交换**：拿锁必须先于一切副作用，
+  回收的正确性依赖这条不变式。daemon 还要定期重读注册文件自查 `id`，被抢注就自行退出
+  （opencode `packages/cli/src/services/daemon.ts:174-179`）。
+- 客户端侧健康认证：读注册文件 → connect → 三帧握手（`verify_proof` 在
+  `zcode_utils::daemon`）。**先认证再对 PID 发信号**，PID 会被复用
+  （opencode `daemon.ts:152-159`）。
+- 接管仲裁的**执行**：判据字段已在 `Subscribe` 里（`client` / `has_local_history` / `takeover`），
+  仲裁逻辑与踢人动作待写（jcode `server/client_session.rs:1264-1265,1417-1418,1485-1490`；
+  注意首次 Subscribe 与 Resume 两处判据不同，Resume 多一条"同实例直通"）。
+- Windows 主线程栈设 8 MiB（jcode `src/main.rs:77-95`：Windows PE 默认主线程栈 1 MiB，
+  provider setup 在 tokio 接管前就能吃穿它，得到**不可恢复**的 `STATUS_STACK_OVERFLOW`。
+  用专线程而不是 `/STACK` 链接器参数：后者是 crate 级的，会波及每个辅助二进制）。
 
 ### 第 3 期：秒开
 
@@ -110,18 +101,25 @@ WebSocket / TCP 出口 = 写一个 relay + `stream_pair()` 造一对流交给同
 **server 一行不改**（jcode `gateway.rs:211-220`）。这是"协议边界真的存在"的可证形式；
 若届时发现必须改 `handle_client`，说明边界没做对。
 
-## CI 闸门待补
+## CI 闸门
 
-- **依赖方向 ratchet**：禁止 `zcode-tui` 依赖任何运行时 crate、禁止运行时 crate 依赖
-  `ratatui` / `crossterm`。jcode 的 `scripts/check_dependency_boundaries.py:26-51` 只护
-  `*-types` crate，看不见 `tui -> runtime` 这条边——覆盖面必须扩到它。
-- **协议 schema 快照测试**：防意外破坏 wire 兼容（jcode `crates/jcode-harness-api/src/lib.rs:26-30`）。
-  变体落地后才有意义。
+两条都已落地：
+
+- **依赖方向 ratchet**：`.omp/checks/dep-boundary.check.ts` + CI `dep-boundary` job。
+  三条规则：`zcode-protocol` 不依赖任何内部 crate；`zcode-tui` 不依赖运行时 crate；
+  运行时 crate 不依赖 `ratatui` / `crossterm`。`crates/coding-agent` 是装配层，豁免后两条。
+  jcode 的 `scripts/check_dependency_boundaries.py:26-51` 只护 `*-types` crate，
+  看不见 `tui -> runtime` 这条边——本脚本覆盖了它。
+- **协议 schema 快照**：`crates/protocol/tests/wire_schema.rs` + `tests/wire-schema.json`，
+  外加三个穷尽性哨兵（逐行 `match` + 变体计数），新增变体时先编译报错、再计数报错。
 
 ## 待真机验证（本机 Windows 已覆盖的除外）
 
 | 项 | Windows | macOS | Linux |
 |---|---|---|---|
 | `transport` 往返与单实例互斥 | 已验证 | **需真机** | **需真机** |
-| 陈旧端点双条件回收 | 待落地 | 待落地 | 待落地 |
-| daemon 就绪握手超时上限 | 待落地（jcode 在 Windows Server VPS 上实测 15–60s，给到 120s） | 待落地 | 待落地 |
+| 单实例文件锁互斥 | 已验证 | **需真机** | **需真机** |
+| 注册文件原子覆盖写（目标已存在） | 已验证 | **需真机** | **需真机** |
+| 就绪握手令牌校验与子进程早死报错 | 已验证 | **需真机** | **需真机** |
+| 陈旧端点双条件回收 | 已验证（Windows 无文件节点，回收恒为 no-op） | **需真机**（真正会 unlink 的只有类 Unix） | **需真机** |
+| daemon 就绪握手超时上限 | 待装配（jcode 在 Windows Server VPS 上实测 15–60s，本仓给到 120s） | 待装配 | 待装配 |

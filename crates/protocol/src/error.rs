@@ -33,6 +33,13 @@ pub enum ErrorCode {
     FrameTooLarge,
     /// 握手尚未完成就发了业务请求。
     HandshakeRequired,
+    /// 握手令牌缺失或不匹配，连接即将关闭。
+    ///
+    /// **本机 IPC 也需要令牌**：Unix domain socket 还能靠文件权限把外人挡在外面，
+    /// Windows named pipe **没有文件权限模型**，令牌是唯一防线
+    /// （oh-my-pi `packages/coding-agent/src/launch/paths.ts:8-11` + `client.ts:90`）。
+    /// 令牌写在 owner-only 的注册文件里，与端点路径一起分发。
+    Unauthorized,
     /// 对端比本端新，发来了本端不认识的错误码。**必须**静默接受，不得再回一个错误帧
     /// ——否则两端会互相回错误直到断连。
     #[serde(other)]

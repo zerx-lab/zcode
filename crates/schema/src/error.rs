@@ -36,7 +36,7 @@ pub enum SchemaError {
         reference: String,
     },
     /// `$ref` 链退化成一串"纯引用"节点（`{"$ref": ...}` 首尾相连）且深度超过
-    /// [`crate::validate::MAX_REF_DEPTH`]，判定为死循环引用。
+    /// `crate::validate::MAX_REF_DEPTH`，判定为死循环引用。
     #[error("$ref `{reference}` 的解析深度超过上限")]
     RefDepthExceeded {
         /// 触发深度上限的起始引用字符串。

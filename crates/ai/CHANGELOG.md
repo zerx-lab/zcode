@@ -3,6 +3,9 @@
 格式与归属标注规则见 `rule://zcode-workflow`。
 
 ## [Unreleased]
+### Breaking Changes
+
+- 项目许可证从 `MIT OR Apache-2.0` 切换为 `AGPL-3.0-only`。
 
 ### Added
 
@@ -64,3 +67,5 @@
   `event: ping\n\n` 保活会让下游按空串解 JSON 而中断整条流。
 - 开块不再产生 `delta: ""` 的空事件；Responses 的助手历史保持文本与工具调用的原始
   先后顺序。
+- rustdoc 在 `-D warnings` 下报的文档链接问题：`provider/openai_chat.rs` 模块文档中指向
+  私有 `tool_call_key` 的 intra-doc 链接降级为代码 span。

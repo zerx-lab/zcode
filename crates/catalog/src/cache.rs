@@ -26,13 +26,13 @@
 //! ## 失效通道只有一条
 //!
 //! 缓存主键是 `(provider_id, endpoint_fingerprint)`；一行是否仍然新鲜只看两个
-//! 维度：[`SCHEMA_VERSION`]（表结构版本，[`ModelCache::open`]/[`ModelCache::in_memory`]
+//! 维度：`SCHEMA_VERSION`（表结构版本，[`ModelCache::open`]/[`ModelCache::in_memory`]
 //! 建表后立即清掉不匹配的行）与 `static_fingerprint`（调用方对该 provider“形状”
 //! 算出的哈希，[`ModelCache::load`] 里比对，不匹配则视为未命中并顺手删除该行）。
 //! 不额外维护第三条失效路径——上游历史上并行长出过 schema version、fingerprint
 //! version、手工 bump 的 cache-provider-id 三套并存的失效机制，其中 schema
 //! version 的迁移语句还把旧版本值原地 `UPDATE` 成新版本号，悄悄吞掉了此后每一次
-//! 本该发生的失效（这正是 [`SCHEMA_VERSION`] 的文档里强调“只能删行或加列，绝不能
+//! 本该发生的失效（这正是 `SCHEMA_VERSION` 的文档里强调“只能删行或加列，绝不能
 //! 原地改写版本号”的原因）。
 
 use std::path::{Path, PathBuf};

@@ -14,7 +14,7 @@
 //!
 //! **教训：协议边界要么由编译器与 CI 强制，要么就不存在。**
 //!
-//! # 本期落地范围
+//! # 落地范围
 //!
 //! | 模块 | 内容 |
 //! |---|---|
@@ -22,10 +22,10 @@
 //! | [`envelope`] | 每帧信封：版本、单调 id、`reply_to` |
 //! | [`frame`] | NDJSON 编解码与增量解帧器 |
 //! | [`error`] | 结构化协议错误帧与错误码 |
+//! | [`wire`] | payload 变体：[`Request`] / [`Reply`] / [`Event`] 与它们的领域投影 |
 //!
-//! 以上四层与 agent 领域无关，是协议**自有**的部分。`Request` / `Event` 的变体尚未落地：
-//! agent 运行时还没有形状可映射，现在写就是凭空发明。它们落地时进本 crate，
-//! 作为 [`Envelope`] 的 payload 类型参数。
+//! 前四层与 agent 领域无关，是协议**自有**的部分；[`wire`] 是领域投影，
+//! 与 `zcode-agent` 的落盘类型是两套形状，互转由 host adapter 负责。
 //!
 //! # 传输是可替换的
 //!
@@ -75,8 +75,10 @@ pub mod envelope;
 pub mod error;
 pub mod frame;
 pub mod version;
+pub mod wire;
 
 pub use envelope::{Envelope, IdGen};
 pub use error::{ErrorCode, ProtocolError};
 pub use frame::{FrameDecoder, FrameError, MAX_FRAME_BYTES, encode};
 pub use version::{Hello, PROTOCOL_VERSION, Version, VersionMismatch};
+pub use wire::{ClientFrame, Event, RawEnvelope, Reply, Request, ServerFrame};

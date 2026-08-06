@@ -1,6 +1,27 @@
 //! 协议版本、握手与协商。
 //!
-//! 抄源：jcode `crates/jcode-harness-api/src/lib.rs:11-15,31-34`。
+//! # 握手是三帧，且**双向**认证
+//!
+//! ```text
+//! client → ClientHello { version, agent, nonce_c }
+//! server → ServerHello { version, agent, nonce_s, proof = f(secret, "server", nonce_c) }
+//! client → ClientAuth  { proof = f(secret, "client", nonce_s) }   // 校验 server proof 通过才发
+//! ```
+//!
+//! **客户端绝不先出示凭据。** 明文 bearer 在本机 IPC 上有真实攻击面：Windows named pipe
+//! **没有文件权限模型**，任何本机进程都能抢先用同名 pipe 占坑（oh-my-pi
+//! `packages/coding-agent/src/launch/paths.ts:8-11` + `client.ts:90` 记录了"token 是唯一
+//! 防线"这一前提）。若客户端首帧就把注册文件里的密钥发出去，占坑者一次连接就把密钥收走，
+//! 随后既能冒充 daemon 也能去连真 daemon。让服务端先证明持有密钥，占坑者在第二帧就被识破，
+//! 密钥一次都不上线。
+//!
+//! nonce 每次连接现生成，上一次握手的 proof 无法重放；域分隔串（`"server"` / `"client"`）
+//! 防的是把服务端应答原样反射回去冒充客户端应答。
+//!
+//! 密钥来自 daemon 注册文件（owner-only），HMAC 计算与常数时间比对都在 `zcode-utils` 的
+//! `daemon` 模块——**协议层不碰密钥**，只搬运不透明字符串。
+//!
+//! 版本协商本身抄源：jcode `crates/jcode-harness-api/src/lib.rs:11-15,31-34`。
 
 use std::fmt;
 
@@ -85,6 +106,53 @@ impl Hello {
             agent: agent.into(),
         }
     }
+}
+
+/// 一次性随机数，base64url 无填充编码。
+///
+/// 每条连接、每个方向各生成一个，**绝不复用**：复用会让上一次握手的证明可以被重放。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Nonce(pub String);
+
+/// 对一个 [`Nonce`] 的持有证明，base64url 无填充编码。
+///
+/// 计算方式是 `HMAC(注册密钥, 域分隔串 ‖ 对端 nonce)`，实现在 `zcode_utils::daemon`
+/// （本 crate 不依赖它，因此这里不做 intra-doc 链接）——**协议层不碰密钥**，
+/// 只搬运不透明字符串。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Proof(pub String);
+
+/// 客户端首帧。
+///
+/// **不携带任何凭据。** 客户端在这一步只出示 nonce，等服务端先证明自己持有注册密钥。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClientHello {
+    /// 版本与实现标识。
+    #[serde(flatten)]
+    pub hello: Hello,
+    /// 客户端出的挑战。
+    pub nonce: Nonce,
+}
+
+/// 服务端首帧：同时是对客户端挑战的应答。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServerHello {
+    /// 版本与实现标识。
+    #[serde(flatten)]
+    pub hello: Hello,
+    /// 服务端出的挑战。
+    pub nonce: Nonce,
+    /// 对 [`ClientHello::nonce`] 的应答。客户端校验不过必须立刻断开。
+    pub proof: Proof,
+}
+
+/// 客户端第二帧：对服务端挑战的应答。握手到此结束。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClientAuth {
+    /// 对 [`ServerHello::nonce`] 的应答。
+    pub proof: Proof,
 }
 
 #[cfg(test)]

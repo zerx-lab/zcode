@@ -23,8 +23,10 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 | 格式化   | `cargo fmt --all`（校验用 `cargo fmt --all --check`）                |
 | 测试     | `cargo nextest run --workspace`                                     |
 | Doctest  | `cargo test --doc --workspace`（doctest 不进 nextest）              |
+| 文档     | `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features`（rustdoc 的私有链接/歧义链接只在这里报） |
+| 交叉 lint | `rustup target add <另一平台的 triple>` 后 `cargo clippy -p zcode-utils --lib --all-features --target <同一 triple> -- -D warnings`（选哪个 triple 与理由见 `/gate` 第 7 步） |
 | 依赖审计 | `cargo deny check`、`cargo machete`                                 |
-| 跨平台   | `cargo check --workspace --all-targets --target <triple>`（目标清单见 CI 的 cross-check job） |
+| 交叉编译检查 | `cargo check --workspace --all-targets --target <triple>`（目标清单见 CI 的 cross-check job） |
 | 索引校验 | `bun .omp/checks/index-guard.check.ts`                              |
 
 一次跑全套：`/gate`。聚焦验证：`cargo nextest run -p <crate> <filter>`。
@@ -57,6 +59,9 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 - `crates/agent/src/session/` — 会话持久化 = **JSONL 条目树**（`parent_id` 成树，上下文 = 根到 head 的路径，`/branch` 与 `/rewind` 只换 head）。已否决 snapshot+journal 与 SQLite 事件溯源，取舍见 `plans/runtime-boundary/README.md` 第 7 节
 - `crates/agent/src/approval.rs` — 审批 = **tier × policy，默认 yolo**；`always` 的授权键是 `(工具名, 工具声明的作用域)`。已显式否决有序 allow/deny/ask ruleset，别再造一套
 - `crates/agent/src/interrupt.rs` — `InterruptSignal`（AtomicBool + epoch + Notify）。持有它的 turn 结束时**必须自己 reset**，没有别人会清；不清则下一个 turn 秒退
+- `crates/agent/src/cancel.rs` — 取消入口。取消请求只带 session id，必须经 `CancelRegistry::cancel_session`：它先递归打后台作业（循环到无新增）再打 runner，别在别处直接 fire 单个信号
+- `crates/protocol/src/wire/` — 所有 wire 变体；与 `crates/agent` 的落盘类型是**两套形状**，互转归 host adapter。改形状要跑 `ZCODE_UPDATE_WIRE_SCHEMA=1` 刷 `crates/protocol/tests/wire-schema.json` 并判 major/minor
+- `crates/utils/src/daemon.rs` — daemon 端点原语：注册文件、单实例锁（`File::try_lock`，**不删锁文件**）、双条件回收、一次性就绪握手、握手 HMAC。拿锁必须先于一切副作用
 - `crates/catalog/src/models.json` — 生成物；源头、生成命令与可复现前提见 `rule://zcode-architecture`
 - `crates/catalog/src/effort.rs` — `Effort` 是 workspace 唯一的推理档位类型，`zcode-ai` 只 re-export；`Effort::Off` 的线上值是 `"none"`
 - `crates/text/src/width.rs`、`crates/text/src/truncate.rs`、`crates/text/src/path.rs` — 显示宽度 / 输出截断 / 路径脱敏的唯一实现，渲染点一律调它们；要求见 `rule://zcode-architecture` 的「TUI 输出清理」
@@ -64,7 +69,7 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 - `crates/tui/src/terminal.rs` — fork 自 codex 的 `Terminal`，但 `draw` 只发相对光标移动（上游发绝对 `MoveTo`）：绝对定位会把已向上滚动的读者拽回底部
 - `crates/tui/src/wrap.rs` — `line_rows` 与 `wrap_line` 必须共用同一套贪心切分；行数被 `insert_history` 用来推进 viewport 锚点，算术公式会少记行
 - `crates/schema/src/compile.rs` — JSON Schema 校验是 fail-closed：schema 形状非法或 `pattern` 编译不了都在 `compile` 期报错，绝不降级成跳过约束
-- `.github/workflows/ci.yml` — 闸门编排：fmt、三平台 clippy/test、cross-check（目标清单以该 workflow 为准）、MSRV（从 `rust-version` 读）、docs、deny、machete、index-guard
+- `.github/workflows/ci.yml` — 闸门编排：fmt、三平台 clippy/test、cross-check（目标清单以该 workflow 为准）、MSRV（从 `rust-version` 读）、docs、deny、machete、index-guard、dep-boundary
 - `.github/dependabot.yml` — cargo 与 actions 每周更新，次版本/补丁合并成一个 PR
 - `.config/nextest.toml` — nextest profile：`default`（本机）与 `ci`
 - `plans/tui/` — TUI 的调研与实施计划（架构、模块、平台、依赖、来源）；`crates/tui/` 的设计事实来源

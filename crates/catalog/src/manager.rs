@@ -361,7 +361,7 @@ struct ModelListEntry {
 /// 返回的 [`ModelSpec`] **定价一律为 `None`**、**模态一律为空**：远端端点不会告诉
 /// 你价格或支持哪些输入/输出模态，猜一个不如承认未知——上游反复强调能力位可以
 /// 跨来源继承，定价绝不可以跨 provider 猜测。这些“空白”条目在 [`resolve`] 里
-/// 与静态目录仲裁时，已知 id 会被静态目录的字段填满（见 [`merge_known`]）。
+/// 与静态目录仲裁时，已知 id 会被静态目录的字段填满（见 `merge_known`）。
 pub fn parse_openai_models_response(body: &[u8]) -> Result<Vec<ModelSpec>, RefreshError> {
     let parsed: ModelsListResponse = serde_json::from_slice(body)?;
 

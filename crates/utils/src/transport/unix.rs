@@ -36,7 +36,10 @@ impl Listener {
 ///
 /// 用途是把"进程内客户端"接到与真跨进程客户端**完全相同**的连接处理函数上，
 /// 从而只保留一条执行路径。抄源：jcode `crates/jcode-base/src/gateway.rs:211-220`。
-#[expect(
+// 不用 `#[expect]`：`unused_async` 会被 `mod.rs` 里 `pub use ... stream_pair` 这条路径
+// 当成"async fn 被当值使用"而整体静默（clippy#13466 的同一机制），expect 于是永远不满足，
+// 在 cfg(unix) 上被 `-D warnings` 打成错误。
+#[allow(
     clippy::unused_async,
     reason = "签名要与 Windows 侧一致：那边必须 await 服务端的 connect 握手"
 )]

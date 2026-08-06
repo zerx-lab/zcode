@@ -11,10 +11,9 @@
 //!
 //! | 模块 | 职责 |
 //! | --- | --- |
-//! | [`error`] | 编译期 [`SchemaError`](error::SchemaError) 与运行期 [`ValidationError`](error::ValidationError)/[`ValidationIssue`](error::ValidationIssue)。 |
-//! | `validate`（内部） | 单趟递归校验器：draft 2020-12 关键字实现，不对外导出。 |
-//! | [`compile`] | [`CompiledSchema`](compile::CompiledSchema) 惰性编译 + [`SchemaCache`](compile::SchemaCache) 按内容哈希缓存。 |
-//! | [`render`] | 把 [`ValidationError`](error::ValidationError) 渲染成回灌给模型的错误文本。 |
+//! | [`error`] | 编译期 [`error::SchemaError`] 与运行期 [`error::ValidationError`]/[`error::ValidationIssue`]。 |
+//! | [`compile`] | [`compile::CompiledSchema`] 惰性编译 + [`compile::SchemaCache`] 按内容哈希缓存。 |
+//! | [`render`] | 把 [`error::ValidationError`] 渲染成回灌给模型的错误文本。 |
 //!
 //! # 示例
 //!

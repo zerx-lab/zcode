@@ -1,0 +1,457 @@
+{
+  "event": {
+    "approval_requested": {
+      "kind": "event",
+      "pending": {
+        "call_id": "call_1",
+        "prompt": "允许执行 `tail -n 20 app.log`？",
+        "request_id": "apr_1",
+        "scope": "bash",
+        "tool_name": "bash"
+      },
+      "session": "ses_1",
+      "type": "approval_requested"
+    },
+    "approval_resolved": {
+      "approved": true,
+      "kind": "event",
+      "request_id": "apr_1",
+      "session": "ses_1",
+      "type": "approval_resolved"
+    },
+    "compacted": {
+      "entry": "ent_4",
+      "kind": "event",
+      "session": "ses_1",
+      "type": "compacted"
+    },
+    "failed": {
+      "kind": "event",
+      "message": "提供商请求超时",
+      "session": "ses_1",
+      "type": "failed"
+    },
+    "message_end": {
+      "entry": "ent_2",
+      "kind": "event",
+      "message": {
+        "content": [
+          {
+            "text": "已定位问题。",
+            "type": "text"
+          },
+          {
+            "arguments": "{\"cmd\":\"tail -n 20 app.log\"}",
+            "id": "call_1",
+            "name": "bash",
+            "type": "tool_call"
+          }
+        ],
+        "model": "claude-sonnet-20260101",
+        "role": "assistant",
+        "stop_reason": "tool_use",
+        "usage": {
+          "cache_read": 32,
+          "input": 128,
+          "output": 64,
+          "reasoning": 16
+        }
+      },
+      "session": "ses_1",
+      "type": "message_end",
+      "usage": {
+        "cache_read": 32,
+        "input": 128,
+        "output": 64,
+        "reasoning": 16
+      }
+    },
+    "message_start": {
+      "entry": "ent_2",
+      "kind": "event",
+      "session": "ses_1",
+      "type": "message_start"
+    },
+    "resync": {
+      "dropped": 3,
+      "kind": "event",
+      "session": "ses_1",
+      "type": "resync"
+    },
+    "session_updated": {
+      "head": "ent_2",
+      "kind": "event",
+      "session": "ses_1",
+      "summary": {
+        "created_ms": 1700000000000,
+        "cwd": "/workspace/zcode",
+        "id": "ses_1",
+        "model": "claude-sonnet",
+        "title": "协议冒烟会话",
+        "updated_ms": 1700000060000
+      },
+      "type": "session_updated"
+    },
+    "stdin_requested": {
+      "kind": "event",
+      "pending": {
+        "call_id": "call_2",
+        "is_password": true,
+        "prompt": "password:",
+        "request_id": "stdin_1"
+      },
+      "session": "ses_1",
+      "type": "stdin_requested"
+    },
+    "stdin_resolved": {
+      "kind": "event",
+      "request_id": "stdin_1",
+      "session": "ses_1",
+      "submitted": true,
+      "type": "stdin_resolved"
+    },
+    "text_delta": {
+      "delta": "已定位",
+      "entry": "ent_2",
+      "index": 0,
+      "kind": "event",
+      "session": "ses_1",
+      "type": "text_delta"
+    },
+    "thinking_delta": {
+      "delta": "分析日志中",
+      "entry": "ent_2",
+      "index": 0,
+      "kind": "event",
+      "session": "ses_1",
+      "type": "thinking_delta"
+    },
+    "tool_call_delta": {
+      "call_id": "call_1",
+      "delta": "{\"cmd\":",
+      "entry": "ent_2",
+      "index": 1,
+      "kind": "event",
+      "session": "ses_1",
+      "type": "tool_call_delta"
+    },
+    "tool_end": {
+      "call_id": "call_1",
+      "entry": "ent_3",
+      "is_error": false,
+      "kind": "event",
+      "session": "ses_1",
+      "type": "tool_end"
+    },
+    "tool_progress": {
+      "call_id": "call_1",
+      "kind": "event",
+      "progress": {
+        "text": "tail 输出片段",
+        "type": "chunk"
+      },
+      "session": "ses_1",
+      "type": "tool_progress"
+    },
+    "tool_start": {
+      "call_id": "call_1",
+      "kind": "event",
+      "name": "bash",
+      "session": "ses_1",
+      "type": "tool_start"
+    },
+    "turn_end": {
+      "kind": "event",
+      "session": "ses_1",
+      "type": "turn_end"
+    },
+    "turn_start": {
+      "kind": "event",
+      "session": "ses_1",
+      "type": "turn_start",
+      "user_entry": "ent_1"
+    },
+    "unknown": {
+      "kind": "event",
+      "type": "unknown"
+    }
+  },
+  "reply": {
+    "history": {
+      "entries": [
+        {
+          "id": "ent_2",
+          "message": {
+            "content": [
+              {
+                "text": "已定位问题。",
+                "type": "text"
+              },
+              {
+                "arguments": "{\"cmd\":\"tail -n 20 app.log\"}",
+                "id": "call_1",
+                "name": "bash",
+                "type": "tool_call"
+              }
+            ],
+            "model": "claude-sonnet-20260101",
+            "role": "assistant",
+            "stop_reason": "tool_use",
+            "usage": {
+              "cache_read": 32,
+              "input": 128,
+              "output": 64,
+              "reasoning": 16
+            }
+          },
+          "parent_id": "ent_1",
+          "timestamp_ms": 1700000030000,
+          "type": "message"
+        }
+      ],
+      "kind": "reply",
+      "type": "history"
+    },
+    "ok": {
+      "kind": "reply",
+      "type": "ok"
+    },
+    "pending": {
+      "kind": "reply",
+      "pending": {
+        "approvals": [
+          {
+            "call_id": "call_1",
+            "prompt": "允许执行 `tail -n 20 app.log`？",
+            "request_id": "apr_1",
+            "scope": "bash",
+            "tool_name": "bash"
+          }
+        ],
+        "stdin": [
+          {
+            "call_id": "call_2",
+            "is_password": true,
+            "prompt": "password:",
+            "request_id": "stdin_1"
+          }
+        ]
+      },
+      "type": "pending"
+    },
+    "pong": {
+      "kind": "reply",
+      "type": "pong"
+    },
+    "session_busy": {
+      "holder": "cli_2",
+      "kind": "reply",
+      "type": "session_busy"
+    },
+    "session_created": {
+      "kind": "reply",
+      "root": {
+        "cwd": "/workspace/zcode",
+        "id": "ent_1",
+        "model": "claude-sonnet",
+        "timestamp_ms": 1700000000000,
+        "type": "session_init"
+      },
+      "summary": {
+        "created_ms": 1700000000000,
+        "cwd": "/workspace/zcode",
+        "id": "ses_1",
+        "model": "claude-sonnet",
+        "title": "协议冒烟会话",
+        "updated_ms": 1700000060000
+      },
+      "type": "session_created"
+    },
+    "sessions": {
+      "kind": "reply",
+      "sessions": [
+        {
+          "created_ms": 1700000000000,
+          "cwd": "/workspace/zcode",
+          "id": "ses_1",
+          "model": "claude-sonnet",
+          "title": "协议冒烟会话",
+          "updated_ms": 1700000060000
+        }
+      ],
+      "type": "sessions"
+    },
+    "subscribed": {
+      "entries": [
+        {
+          "id": "ent_2",
+          "message": {
+            "content": [
+              {
+                "text": "已定位问题。",
+                "type": "text"
+              },
+              {
+                "arguments": "{\"cmd\":\"tail -n 20 app.log\"}",
+                "id": "call_1",
+                "name": "bash",
+                "type": "tool_call"
+              }
+            ],
+            "model": "claude-sonnet-20260101",
+            "role": "assistant",
+            "stop_reason": "tool_use",
+            "usage": {
+              "cache_read": 32,
+              "input": 128,
+              "output": 64,
+              "reasoning": 16
+            }
+          },
+          "parent_id": "ent_1",
+          "timestamp_ms": 1700000030000,
+          "type": "message"
+        }
+      ],
+      "head": "ent_2",
+      "kind": "reply",
+      "pending": {
+        "approvals": [
+          {
+            "call_id": "call_1",
+            "prompt": "允许执行 `tail -n 20 app.log`？",
+            "request_id": "apr_1",
+            "scope": "bash",
+            "tool_name": "bash"
+          }
+        ],
+        "stdin": [
+          {
+            "call_id": "call_2",
+            "is_password": true,
+            "prompt": "password:",
+            "request_id": "stdin_1"
+          }
+        ]
+      },
+      "summary": {
+        "created_ms": 1700000000000,
+        "cwd": "/workspace/zcode",
+        "id": "ses_1",
+        "model": "claude-sonnet",
+        "title": "协议冒烟会话",
+        "updated_ms": 1700000060000
+      },
+      "turn_active": true,
+      "type": "subscribed"
+    },
+    "turn_started": {
+      "kind": "reply",
+      "type": "turn_started",
+      "user_entry": "ent_1"
+    },
+    "unknown": {
+      "kind": "reply",
+      "type": "unknown"
+    }
+  },
+  "request": {
+    "approval_respond": {
+      "kind": "request",
+      "reply": "once",
+      "request_id": "apr_1",
+      "type": "approval_respond"
+    },
+    "cancel": {
+      "kind": "request",
+      "session": "ses_1",
+      "type": "cancel"
+    },
+    "compact": {
+      "kind": "request",
+      "session": "ses_1",
+      "type": "compact"
+    },
+    "history_fetch": {
+      "kind": "request",
+      "session": "ses_1",
+      "since": "ent_1",
+      "type": "history_fetch"
+    },
+    "pending_list": {
+      "kind": "request",
+      "session": "ses_1",
+      "type": "pending_list"
+    },
+    "ping": {
+      "kind": "request",
+      "type": "ping"
+    },
+    "prompt": {
+      "content": [
+        {
+          "text": "帮我看看这段日志",
+          "type": "text"
+        }
+      ],
+      "kind": "request",
+      "session": "ses_1",
+      "type": "prompt"
+    },
+    "session_create": {
+      "cwd": "/workspace/zcode",
+      "kind": "request",
+      "model": "claude-sonnet",
+      "type": "session_create"
+    },
+    "session_list": {
+      "cwd": "/workspace/zcode",
+      "kind": "request",
+      "type": "session_list"
+    },
+    "set_approval_mode": {
+      "kind": "request",
+      "mode": "write",
+      "session": "ses_1",
+      "type": "set_approval_mode"
+    },
+    "set_head": {
+      "entry": "ent_2",
+      "kind": "request",
+      "session": "ses_1",
+      "type": "set_head"
+    },
+    "set_model": {
+      "kind": "request",
+      "model": "claude-opus",
+      "session": "ses_1",
+      "type": "set_model"
+    },
+    "set_title": {
+      "kind": "request",
+      "session": "ses_1",
+      "title": "日志排查",
+      "type": "set_title"
+    },
+    "stdin_respond": {
+      "kind": "request",
+      "request_id": "stdin_1",
+      "text": "y",
+      "type": "stdin_respond"
+    },
+    "subscribe": {
+      "client": "cli_1",
+      "has_local_history": true,
+      "kind": "request",
+      "session": "ses_1",
+      "since": "ent_1",
+      "takeover": false,
+      "type": "subscribe"
+    },
+    "unsubscribe": {
+      "kind": "request",
+      "session": "ses_1",
+      "type": "unsubscribe"
+    }
+  }
+}

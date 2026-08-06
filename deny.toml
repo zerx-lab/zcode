@@ -29,6 +29,7 @@ allow = [
   "MIT-0",
   "Unicode-3.0",
   "Zlib",
+  "AGPL-3.0-only",
 ]
 confidence-threshold = 0.93
 # 允许列表是策略而非现状快照：尚未被任何依赖用到的许可不该刷警告。

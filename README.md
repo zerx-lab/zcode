@@ -44,4 +44,4 @@ cargo run -p zcode -- --help
 
 ## 许可
 
-双许可：[MIT](LICENSE-MIT) 或 [Apache-2.0](LICENSE-APACHE)，任选其一。
+本项目采用 [GNU Affero General Public License v3.0](LICENSE-AGPL-3.0)，SPDX 标识为 `AGPL-3.0-only`。

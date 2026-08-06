@@ -11,7 +11,7 @@
 //!
 //! jcode 在流循环里维护 11 个 per-stream 可变局部变量，provider 中途重放时要**逐个手工清空**
 //! （`turn_streaming_mpsc.rs:718-777`），漏一个就是重放后内容重复。本仓把它们收进
-//! [`StreamAccumulator`]，重放就是一次 `reset()`。
+//! `StreamAccumulator`，重放就是一次 `reset()`。
 //!
 //! # 助手条目 id 在开流前就分配
 //!
@@ -30,6 +30,7 @@ use std::sync::Arc;
 use crate::approval::{
     ApprovalGate, ApprovalMode, Policy, UserPolicies, denial_message, resolve_approval,
 };
+use crate::cancel::{CancelRegistry, TurnRegistration};
 use crate::context::{
     CompactionPlan, ContextBudget, effective_context_tokens, estimate_context, plan_compaction,
     reported_context_tokens,
@@ -301,20 +302,19 @@ impl StreamAccumulator {
     }
 }
 
-/// turn 期间持有的取消信号守卫。
+/// turn 期间持有的守卫。
 ///
-/// **`Drop` 里必须 `reset()`**：取消可能由外部 handle 投递到本 turn 的信号上，而没有任何
-/// 其他人会清它；不清就是永久置位，下一个 turn 会秒退。这是 jcode
-/// `crates/jcode-app-core/src/turn_cancel_registry.rs:106` 记录过的坑，也是移植时最容易漏的一条。
+/// **软取消信号的复位在这里，硬取消信号的复位在 [`TurnRegistration`] 的 `Drop` 里**——
+/// 后者是注册表统一保证的，让每个信号只有一处复位点，避免两处各清一半。
 #[derive(Debug)]
 struct TurnGuard {
-    cancel: InterruptSignal,
     steering: InterruptSignal,
+    /// 注册进取消注册表；drop 时注销并复位硬取消信号。
+    _registration: TurnRegistration,
 }
 
 impl Drop for TurnGuard {
     fn drop(&mut self) {
-        self.cancel.reset();
         self.steering.reset();
     }
 }
@@ -363,6 +363,7 @@ pub struct AgentRuntime {
     store: SessionStore,
     events: EventSink,
     approvals: Arc<ApprovalGate>,
+    cancels: Arc<CancelRegistry>,
     config: TurnConfig,
     cancel: InterruptSignal,
     steering: InterruptSignal,
@@ -372,11 +373,15 @@ pub struct AgentRuntime {
 
 impl AgentRuntime {
     /// 组装一个运行时。
+    ///
+    /// `cancels` 是**跨会话共享**的：取消请求只带 session id 过来，必须能从一张表里找到
+    /// 该会话所有在飞 turn 与后台作业的信号。同一个进程里的所有运行时共用一张表。
     #[must_use]
     pub fn new(
         provider: Arc<dyn Provider>,
         registry: Arc<ToolRegistry>,
         store: SessionStore,
+        cancels: Arc<CancelRegistry>,
         config: TurnConfig,
     ) -> Self {
         let events = EventSink::new();
@@ -387,11 +392,18 @@ impl AgentRuntime {
             store,
             events,
             approvals,
+            cancels,
             config,
             cancel: InterruptSignal::new(),
             steering: InterruptSignal::new(),
             last_reported: None,
         }
+    }
+
+    /// 取消注册表。取消请求经它按 session id 找到本 turn 的信号。
+    #[must_use]
+    pub fn cancels(&self) -> &Arc<CancelRegistry> {
+        &self.cancels
     }
 
     /// 事件广播端：客户端从这里订阅。
@@ -435,8 +447,10 @@ impl AgentRuntime {
         self.events.emit(AgentEvent::TurnStart { user_entry });
 
         let _guard = TurnGuard {
-            cancel: self.cancel.clone(),
             steering: self.steering.clone(),
+            _registration: self
+                .cancels
+                .register_turn(self.store.tree().session_id(), self.cancel.clone()),
         };
         let result = self.drive().await;
         // 无论成败都要把待审批清空：调用方正在 `await` 那个 oneshot，
@@ -1134,20 +1148,23 @@ mod tests {
     }
 
     #[test]
-    fn turn_guard_clears_the_signal_it_borrowed() {
-        // 没有别人会清这个信号；不清就是下一个 turn 秒退。
+    fn turn_guard_clears_both_signals_between_turns() {
+        // 硬取消由注册表守卫复位、软取消由 TurnGuard 复位；任一处漏了都会让下一个 turn 秒退。
+        let registry = Arc::new(CancelRegistry::new());
+        let session = crate::id::SessionId::from("ses_guard".to_owned());
         let cancel = InterruptSignal::new();
         let steering = InterruptSignal::new();
         {
             let _guard = TurnGuard {
-                cancel: cancel.clone(),
                 steering: steering.clone(),
+                _registration: registry.register_turn(&session, cancel.clone()),
             };
             cancel.fire();
             steering.fire();
         }
         assert!(!cancel.is_set());
         assert!(!steering.is_set());
+        assert!(!registry.is_turn_active(&session));
     }
 
     #[test]

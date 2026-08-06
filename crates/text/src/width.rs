@@ -2,7 +2,7 @@
 //!
 //! 宽度一律经 `unicode-width` 计算，绝不用 `str::len()`。多码点 grapheme 簇
 //! （ZWJ 序列、VS16 emoji 表现选择符、keycap 等）必须整簇求宽度，不能逐字符累加，
-//! 否则会把 `👨‍👩‍👧‍👦`（正确宽度 2）算成 8 列。详见 [`grapheme_width`]。
+//! 否则会把 `👨‍👩‍👧‍👦`（正确宽度 2）算成 8 列。详见 `grapheme_width`。
 
 use std::borrow::Cow;
 use std::ops::Range;
@@ -531,7 +531,7 @@ fn flush_wrap_line(
 
 /// 按显示宽度硬换行；`width == 0` 无可用列，返回空集合。
 /// 输入中已有的换行符也会作为强制断行点。SGR 与 OSC8 超链接状态跨行携带
-/// （见 [`update_ansi_carry_state`] 与 [`flush_wrap_line`]）。
+/// （见 `update_ansi_carry_state` 与 `flush_wrap_line`）。
 #[must_use]
 pub fn wrap_to_width(s: &str, width: usize) -> Vec<String> {
     wrap_to_width_with_tab(s, width, DEFAULT_TAB_WIDTH)

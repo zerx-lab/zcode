@@ -3,6 +3,9 @@
 格式与归属标注规则见 `rule://zcode-workflow`。
 
 ## [Unreleased]
+### Breaking Changes
+
+- 项目许可证从 `MIT OR Apache-2.0` 切换为 `AGPL-3.0-only`。
 
 ### Added
 
@@ -24,3 +27,9 @@
   宁可拒绝一个支持不了的 schema，也不给假阳性。
 - `unevaluatedProperties` / `unevaluatedItems` 未实现，按宽松处理，但会经
   `unsupported_keywords()` 显式上报——上游只在进程内 warn 一次，调用方观测不到，不继承该缺口。
+
+### Fixed
+
+- rustdoc 在 `-D warnings` 下报的文档链接问题：`error.rs` 指向私有 `MAX_REF_DEPTH` 的
+  intra-doc 链接降级为代码 span，`lib.rs` 模块表里 6 处 `redundant_explicit_links` 改为
+  显示文本自带路径。

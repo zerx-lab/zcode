@@ -15,12 +15,16 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+base64.workspace = true
+getrandom.workspace = true
+hmac.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+# pipe 名要对小写归一化后的路径做摘要（transport/windows.rs），daemon 握手要 HMAC-SHA256。
+sha2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-
-# pipe 名需要对小写归一化后的路径做摘要，见 src/transport/windows.rs。
-[target.'cfg(windows)'.dependencies]
-sha2.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -59,24 +59,35 @@ jobs:
       # nextest 不跑 doctest，必须单独来一轮。
       - run: cargo test --locked --doc --workspace --all-features
 
-  # 三个 runner（ubuntu x86_64 / macos arm64 / windows x86_64）覆盖不到的目标：
-  # 只做 cargo check——check 不链接，因此不需要交叉链接器或交叉 C 工具链。
+  # 三个 runner（ubuntu x86_64 / macos arm64 / windows x86_64）覆盖不到的目标。
+  # 注意：`cargo check` **会**执行 build script，ring / libsqlite3-sys / zstd-sys 在
+  # build script 里用 cc-rs 编译 C，因此交叉 C 工具链是必需的，不能靠"check 不链接"省掉。
+  # Apple / MSVC 的 SDK 只有对应 host 才有，所以按 host 分配 runner；Linux 目标用
+  # setup-cross-toolchain-action 装 gcc + 设 CC_*/CFLAGS_*。
   cross-check:
     name: cross-check (${{ matrix.target }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - x86_64-apple-darwin
-          - aarch64-pc-windows-msvc
-          - aarch64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
+      - if: runner.os == 'Linux'
+        uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
       - run: rustup target add ${{ matrix.target }}
       - run: cargo check --locked --workspace --all-targets --all-features --target ${{ matrix.target }}
 
@@ -135,3 +146,11 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
       - run: bun .omp/checks/index-guard.check.ts
+
+  dep-boundary:
+    name: crate 依赖方向 ratchet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: bun .omp/checks/dep-boundary.check.ts

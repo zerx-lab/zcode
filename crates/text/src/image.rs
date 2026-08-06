@@ -91,7 +91,7 @@ pub enum ImageError {
         #[source]
         source: image::ImageError,
     },
-    /// 输入字节数超过 [`MAX_INPUT_BYTES`]。
+    /// 输入字节数超过 `MAX_INPUT_BYTES`。
     #[error("图像字节数 {bytes} 超过上限 {limit}")]
     TooLarge {
         /// 实际字节数。
@@ -107,7 +107,7 @@ pub enum ImageError {
         /// 退化高度。
         height: u32,
     },
-    /// 探测到的像素总数（宽 × 高）超过 [`MAX_PIXELS`]：文件头可能声明了远超实际内容
+    /// 探测到的像素总数（宽 × 高）超过 `MAX_PIXELS`：文件头可能声明了远超实际内容
     /// 体量的巨幅尺寸（典型解压炸弹构造），在解码前就拒绝，不给分配器机会。
     #[error("图像像素总数 {width}×{height} 超过上限 {limit}")]
     TooManyPixels {
@@ -252,7 +252,7 @@ impl ProcessedImage {
 ///
 /// # 错误
 ///
-/// - 输入超过 [`MAX_INPUT_BYTES`] → [`ImageError::TooLarge`]。
+/// - 输入超过 `MAX_INPUT_BYTES` → [`ImageError::TooLarge`]。
 /// - magic bytes 无法识别，或识别出的格式不在本 crate 支持的四种之内 → [`ImageError::UnknownFormat`]。
 /// - 识别出格式但文件头本身损坏（如声明的尺寸字段不合法）→ [`ImageError::Decode`]。
 pub fn probe_dimensions(input: &[u8]) -> Result<(u32, u32, ImageMime), ImageError> {
@@ -278,9 +278,9 @@ pub fn probe_dimensions(input: &[u8]) -> Result<(u32, u32, ImageMime), ImageErro
 ///
 /// 流水线：
 /// 1. [`probe_dimensions`] 拿原始尺寸与格式（只读文件头，不解码像素）；
-/// 2. 宽 × 高超过 [`MAX_PIXELS`] → 立即拒绝（防解压炸弹，见该常量文档）；
+/// 2. 宽 × 高超过 `MAX_PIXELS` → 立即拒绝（防解压炸弹，见该常量文档）；
 /// 3. 尺寸已合规**且**字节数 ≤ `max_bytes/4` → 原样返回（`reencoded = false`）；
-/// 4. 否则解码（解码器同样带着 [`MAX_PIXELS`] 派生的资源上限，双重防护），按
+/// 4. 否则解码（解码器同样带着 `MAX_PIXELS` 派生的资源上限，双重防护），按
 ///    [`ResizeOptions`] 等比缩放（过小的放大到 `min_dimension`，过大的压到
 ///    `max_width`/`max_height`，用 [`FilterType::Lanczos3`] 保真）；
 /// 5. PNG/JPEG/WebP（`allow_webp` 控制是否含 WebP）并行编码，取最小的一个；
@@ -382,11 +382,11 @@ pub fn process_image(input: &[u8], options: &ResizeOptions) -> Result<ProcessedI
     })
 }
 
-/// 解码器级别的资源上限，作为 [`MAX_PIXELS`] 校验之外的第二道防线。
+/// 解码器级别的资源上限，作为 `MAX_PIXELS` 校验之外的第二道防线。
 ///
 /// `Limits` 是 `#[non_exhaustive]`，只能从 `Default` 出发逐字段覆盖。`max_image_width`/
-/// `max_image_height` 复用 [`MAX_PIXELS`] 作单边尺寸上限，`max_alloc` 钉住解码器允许
-/// 分配的总字节数（按 RGBA8 4 字节/像素估算，与 [`MAX_PIXELS`] 的前提保持一致）。
+/// `max_image_height` 复用 `MAX_PIXELS` 作单边尺寸上限，`max_alloc` 钉住解码器允许
+/// 分配的总字节数（按 RGBA8 4 字节/像素估算，与 `MAX_PIXELS` 的前提保持一致）。
 fn decode_limits() -> Limits {
     // MAX_PIXELS = 64_000_000 远小于 u32::MAX，`try_from` 恒为 Ok；unwrap_or 只是类型
     // 系统要求的兜底，不代表这条路径预期失败。

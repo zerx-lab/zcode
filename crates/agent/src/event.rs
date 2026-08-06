@@ -151,6 +151,24 @@ pub enum AgentEvent {
         /// 压缩条目 id。
         entry: EntryId,
     },
+    /// 需要用户输入一行 stdin。
+    StdinRequested {
+        /// 请求 id。
+        request_id: String,
+        /// 触发请求的工具调用 id。
+        call_id: String,
+        /// 展示给用户的提示体。
+        prompt: String,
+        /// 是否应作为密码处理：客户端应关闭回显与本地历史。
+        is_password: bool,
+    },
+    /// stdin 请求已结算——**任何**一条待回答请求消失都必须有这条事件，客户端靠它移除 UI。
+    StdinResolved {
+        /// 请求 id。
+        request_id: String,
+        /// 是否提交了答案（`false` = 取消 / 未提交）。
+        submitted: bool,
+    },
     /// 一次 turn 结束。
     TurnEnd,
     /// 本次 turn 以错误告终。
