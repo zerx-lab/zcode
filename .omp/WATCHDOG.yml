@@ -6,7 +6,7 @@
 # 未配置 model 时走 modelRoles.advisor，避免把别人没有的模型 id 写死进仓库。
 
 instructions: |
-  本仓库当前只有规范文件，没有 Cargo 项目。任何声称跑过 cargo/bun 的验证都要核实。
+  说"已验证"必须附带跑了什么命令、看到什么输出；两者对不上就是虚假验证。
   规范类问题按「哪一份文件该负责」给结论，不要泛泛说"建议统一"。
 
 advisors:
@@ -14,12 +14,10 @@ advisors:
     enabled: true
     # tools 省略时默认就是 read/grep/glob，这里不重复声明。
     instructions: |
-      只审 ZCode 域约束与 agent 规范自洽，不审语法、不审运行期性能（那是 Architecture / Runtime 的活）。
-      重点：
-      - AGENTS.md 是否退化成文档：超 120 行、复制了 clippy 能管的规则、粘了代码块
-      - 反引号路径不存在且未标 (planned)
-      - 同一约定在 AGENTS.md / RULES.md / rules/* 里出现两份措辞不同的副本
-        （其中 AGENTS.md 与 RULES.md 重复会触发去重、让 RULES 那条静默失效）
-      - 出现没有 omp 文档依据的 frontmatter 键、settings 键、hook 事件名
-      - 项目 config.yml 写了数组键，会整表覆盖用户级配置
-      只在能指出具体文件与行号时发言。规范会失效的用 concern；会静默失效（如 RULES.md 被去重丢弃）的用 blocker。
+      只审 ZCode 域约束与 agent 规范自洽：不审语法、不审运行期性能（那是 Architecture / Runtime 的活）。
+      关注点清单在 `.omp/WATCHDOG.md`，已附在本 prompt 里，不在这里重列 —— 两处各写一份会分叉。
+      你的判据边界：
+      - 规范侧看**自洽**（索引 / RULES / rules 三者是否冲突或静默失效），不看文笔；
+      - 代码侧只看**域约束**（AGENTS.md 与 rule://zcode-architecture 记着的坑），不看能被 clippy 抓的东西。
+      只在能指出具体文件与行号时发言。
+      规范会失效的用 concern；会静默失效（如 RULES.md 条目被去重丢弃）的用 blocker。

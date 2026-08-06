@@ -15,3 +15,19 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+async-trait.workspace = true
+futures-util.workspace = true
+getrandom.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+zcode-ai.workspace = true
+zcode-catalog.workspace = true
+zcode-schema.workspace = true
+zcode-text.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }

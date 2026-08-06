@@ -136,16 +136,35 @@ TUI 关掉它还得活着。同进程方案下 server 就在 TUI 进程里，age
 6. oneshot-by-request-id 的 UI 回环（`server/client_lifecycle.rs:633-666` + `wire.rs:347-356`）。
    ZCode 的权限审批照这个形状做 —— jcode 把机制建好了却没用在权限上，opencode 用了但重连会丢。
 7. 就绪握手 + `flock` 单实例 + 陈旧 socket 双条件回收（`server/socket.rs:229-274,88-137,159-193`）。
-8. session 持久化 snapshot `.json` + 增量 `.journal.jsonl`，读路径**单行损坏只跳这一行**
-   （`crates/jcode-base/src/session/persistence.rs:66-125,320-405`）。对照 opencode 的 SQLite 事件溯源
-   —— 后者付了约 40 条 migration 的维护债（`packages/core/src/database/migration/`）。
+8. **持久化：已改判为 JSONL 条目树（用户拍板）。** 采用 oh-my-pi
+   `packages/coding-agent/src/session/session-entries.ts:58-62,245-260` 的形状：
+   每条条目带 `parent_id` 构成树，当前上下文 = 根到 head 的路径，`/branch` 与 `/rewind`
+   只是换 head，零拷贝。落地在 `crates/agent/src/session/`。
+   - 被否决的方案与代价：jcode 的 snapshot `.json` + 增量 `.journal.jsonl`
+     （`crates/jcode-base/src/session/persistence.rs:66-125,320-405`）写放大最小，但只有线性历史，
+     要做分支就得整份复制会话文件；opencode 的 SQLite 事件溯源
+     （`packages/core/src/event.ts:234-370`）可重放可审计，但每次非 delta 状态变更都是一次同步
+     事务，且已付出约 40 条 migration 的维护债（`packages/core/src/database/migration/`）。
+   - **仍然照抄**：读路径**单行损坏只跳这一行**并继续（同上 jcode 坐标）。首错即停的表现是
+     "用户丢了整个尾部"。
 
 来自 opencode：
 
 9. turn 属于 session scope 而非请求（`packages/opencode/src/effect/runner.ts:88` + `session/run-state.ts:37`）。
    这是 UI 可随时断开重连的**唯一必要条件**，且在单进程里也该这么写。
-10. 有序 allow/deny/ask ruleset，`findLast` 语义 + `always` 连锁放行 / `reject` 连坐
-    （`packages/opencode/src/permission/index.ts:28-38,131-165`）。jcode 这块没有可抄的。
+10. **权限：只抄回环，不抄 ruleset（用户拍板）。**
+    - **抄**：`always` 连锁放行 / `reject` 连坐 / 每次结算都广播 replied
+      （`packages/opencode/src/permission/index.ts:98-167`）。jcode 这块没有可抄的
+      （`crates/jcode-base/src/safety.rs:180-193` 的审批从不阻塞，三个结算变体是死代码）。
+    - **不抄**：有序 allow/deny/ask ruleset + `findLast`（`:28-38`）。改用 oh-my-pi 的
+      **tier × policy**，默认模式 `yolo`（`packages/coding-agent/src/tools/approval.ts:29-185`、
+      `packages/coding-agent/src/config/settings-schema.ts:3675-3678`）。
+      代价对比：ruleset 表达力更强、支持路径级 pattern，但默认 `ask` 意味着开箱即用每个工具
+      都弹窗，且必须先有完整审批 UI 才可用；tier × policy 开箱零摩擦，代价是粒度只到工具级。
+      本仓面向单人 power-user，取后者。
+    - 粒度补偿：`always` 的授权键是 `(工具名, 工具声明的作用域)`，工具可自行收窄
+      （`bash` 返回 `bash:git`），使"总是允许"不等于放行整类工具。
+      已落地在 `crates/agent/src/approval.rs`。
 11. 取消要级联到后台作业：先递归取消所有指向本 session 的 background job，循环到无新增，再取消 runner
     （`packages/opencode/src/session/run-state.ts:108-140`）。
 12. daemon 注册文件 + 健康认证 + 版本比对 + 自杀式互斥（`packages/cli/src/services/daemon.ts:40-41,64-78,110-131,159-177`）

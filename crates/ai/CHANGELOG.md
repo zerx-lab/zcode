@@ -32,6 +32,11 @@
 - xAI 适配器配置：API key 走 Chat Completions、SuperGrok OAuth 走 Responses，
   `x-grok-conv-id` 缓存亲和头、`reasoning.summary` 强制省略、
   `reasoning_effort` 按模型前缀白名单下发。
+- `AiError::is_context_overflow()`：判别"上下文超出模型窗口"。三家都把它归在 400
+  `invalid_request` 之下、没有独立状态码（OpenAI 给 `code: "context_length_exceeded"`，
+  Anthropic 只在 message 里写 `prompt is too long`），因此只能靠 `code` / `message` 匹配。
+  判别集中在错误类型上而不是各调用点，避免同一套匹配散落成多份各自漂移；
+  `zcode-agent` 的 turn 循环据此决定压缩后重试而不是直接失败。
 
 ### Fixed
 

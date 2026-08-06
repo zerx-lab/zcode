@@ -193,6 +193,42 @@ impl AiError {
             _ => false,
         }
     }
+
+    /// 该错误是否为"上下文超出模型窗口"。
+    ///
+    /// 调用方（agent 运行时）据此决定压缩后重试，而不是把它当成普通的 400 直接失败。
+    ///
+    /// # 为什么靠 `code` / `message` 匹配
+    ///
+    /// 三家都把它归在 400 `invalid_request` 之下，**没有**独立状态码：OpenAI 给
+    /// `code: "context_length_exceeded"`，Anthropic 只在 `message` 里写
+    /// `prompt is too long`，xAI 走 OpenAI 兼容路径。因此没有比字符串更强的判据可用。
+    /// 判别集中在这里而不是各调用点，是为了避免同一套匹配散落成多份并各自漂移。
+    #[must_use]
+    pub fn is_context_overflow(&self) -> bool {
+        let Self::Api {
+            kind,
+            code,
+            message,
+            ..
+        } = self
+        else {
+            return false;
+        };
+        if *kind != ApiErrorKind::InvalidRequest {
+            return false;
+        }
+        if code
+            .as_deref()
+            .is_some_and(|code| code.eq_ignore_ascii_case("context_length_exceeded"))
+        {
+            return true;
+        }
+        let lowered = message.to_ascii_lowercase();
+        ["prompt is too long", "context length", "context window"]
+            .iter()
+            .any(|needle| lowered.contains(needle))
+    }
 }
 
 #[cfg(test)]
@@ -231,5 +267,51 @@ mod tests {
         };
         assert!(err.is_auth_failure());
         assert!(!err.is_retryable());
+    }
+
+    fn invalid_request(code: Option<&str>, message: &str) -> AiError {
+        AiError::Api {
+            provider: ProviderId::Anthropic,
+            status: 400,
+            kind: ApiErrorKind::InvalidRequest,
+            code: code.map(str::to_owned),
+            message: message.to_owned(),
+            retry_after: None,
+        }
+    }
+
+    #[test]
+    fn context_overflow_is_recognised_from_both_providers_shapes() {
+        // OpenAI 给结构化 code；Anthropic 只有散文。两条都必须认出来，
+        // 否则 agent 会把一次本可压缩重试的请求当成终局失败。
+        assert!(invalid_request(Some("context_length_exceeded"), "").is_context_overflow());
+        assert!(invalid_request(Some("CONTEXT_LENGTH_EXCEEDED"), "").is_context_overflow());
+        assert!(
+            invalid_request(None, "prompt is too long: 210000 tokens > 200000")
+                .is_context_overflow()
+        );
+    }
+
+    #[test]
+    fn other_invalid_requests_are_not_context_overflow() {
+        // 误判的代价是压缩掉一段用不着压缩的历史，然后带着同样非法的请求再撞一次。
+        assert!(!invalid_request(Some("invalid_api_key"), "bad key").is_context_overflow());
+        assert!(
+            !invalid_request(None, "tool_use ids were found without tool_result")
+                .is_context_overflow()
+        );
+        assert!(!AiError::Aborted.is_context_overflow());
+        assert!(
+            !AiError::Api {
+                provider: ProviderId::Anthropic,
+                status: 429,
+                kind: ApiErrorKind::RateLimit,
+                code: None,
+                message: "context length".to_owned(),
+                retry_after: None,
+            }
+            .is_context_overflow(),
+            "限流错误即使文案里带关键词也不是上下文超限"
+        );
     }
 }

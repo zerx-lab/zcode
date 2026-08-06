@@ -36,6 +36,7 @@ async-trait = "0.1"
 base64 = "0.23"
 bytes = "1.12"
 clap = { version = "4.6", features = ["derive"] }
+crossterm = { version = "0.29", features = ["bracketed-paste", "event-stream"] }
 futures-core = "0.3"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 getrandom = "0.4"
@@ -50,7 +51,22 @@ image = { version = "0.25", default-features = false, features = [
   "rayon",
   "webp",
 ] }
+# job control（Ctrl-Z suspend）与 CSI 6n 光标探测，仅 cfg(unix)。
+# 不需要 signal-hook：SIGTSTP 停住进程，SIGCONT 后从 kill 的下一行继续，无需 handler。
+libc = "0.2"
 memchr = "2.8"
+# 只作为排版原语（Buffer/Line/Span/Widget）使用；Terminal 由 zcode-tui 自己 fork，
+# 理由见 plans/tui/modules.md。crossterm_0_29 必须显式开：default-features 关掉后
+# ratatui-crossterm 不会自己选版本，且必须与直接依赖的 crossterm 同版本。
+ratatui = { version = "0.30", default-features = false, features = [
+  "crossterm_0_29",
+  "layout-cache",
+  "scrolling-regions",         # DECSTBM
+  "underline-color",
+  "unstable-backend-writer",   # backend_mut() -> &mut impl Write
+  "unstable-rendered-line-info",
+  "unstable-widget-ref",
+] }
 rayon = "1.12"
 regex = "1.13"
 # bundled：不依赖系统 sqlite，跨平台构建一致（本机 MSVC C 工具链已验证可编译）。
@@ -91,11 +107,18 @@ tokio = { version = "1.53", features = [
 tracing = "0.1"
 url = "2.5"
 webbrowser = "1.2"
+# 自己启用 ENABLE_VIRTUAL_TERMINAL_PROCESSING，不经 crossterm 的 supports_ansi()。
+windows-sys = { version = "0.60", features = [
+  "Win32_Foundation",
+  "Win32_System_Console",
+] }
 zstd = "0.13"
 
 # 仅测试用
 mockito = "1.7"
 tempfile = "3"
+# 解析自己发出的 escape 字节并断言整屏网格；实现了 DECSTBM 滚动区。
+vt100 = "0.16"
 
 # ── lint 单一事实来源 ───────────────────────────────────────────────────
 # 成员 crate 一律写 `[lints] workspace = true`，绝不另建一套。

@@ -15,3 +15,19 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+crossterm.workspace = true
+ratatui.workspace = true
+tracing.workspace = true
+# 显示宽度 / 截断 / 换行的唯一实现落点，见 rule://zcode-architecture「TUI 输出清理」。
+zcode-text.workspace = true
+
+# VT 启用直连 WinAPI，不经 crossterm 的 `supports_ansi()`——理由见 plans/tui/platform.md:20-33。
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+# job control（Ctrl-Z）与 CSI 6n 光标探测。
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[dev-dependencies]
+vt100.workspace = true

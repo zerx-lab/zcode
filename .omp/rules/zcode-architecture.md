@@ -6,7 +6,7 @@ description: ZCode 特有构件约束：crate 职责与导入边界、worker 子
 
 ## Crate 职责表
 
-目标 workspace 由 10 个 crate 组成。十个 crate 目录均已落盘（`zcode`、`zcode-utils`、`zcode-protocol`、`zcode-schema`、`zcode-text`、`zcode-catalog` 有实现，其余暂为骨架）；表内其他路径仍标 `(planned)` 的，落盘后逐条删除标记，不要整表一次性摘掉。
+目标 workspace 由 10 个 crate 组成。十个 crate 目录均已落盘（`zcode-utils`、`zcode-protocol`、`zcode-schema`、`zcode-text`、`zcode-catalog`、`zcode-ai`、`zcode-agent`、`zcode-tui` 有实现；`zcode`、`zcode-stats` 暂为骨架）；表内其他路径仍标 `(planned)` 的，落盘后逐条删除标记，不要整表一次性摘掉。
 
 | Crate | 包名 | 职责 |
 | --- | --- | --- |

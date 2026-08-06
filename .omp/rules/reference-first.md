@@ -83,13 +83,13 @@ ZCode 是从零起步的 harness，绝大多数功能都已经有人在生产里
 | 取消 / 中断原语 | jcode `crates/jcode-agent-runtime/src/lib.rs:20-106`（`InterruptSignal` = AtomicBool + epoch + Notify，**没用** `CancellationToken`；epoch 是为了 Esc 不丢 wakeup） |
 | provider 抽象与流式 | jcode `crates/jcode-provider-core/src/lib.rs:72-99`（`EventStream = Pin<Box<dyn Stream<Item=Result<StreamEvent>> + Send>>`） |
 | 模型目录 | jcode `crates/jcode-provider-core/src/models.rs:13-82`（手写常量）、`crates/jcode-provider-metadata/src/catalog.rs:6-96`（静态 profile + 运行时可刷新） |
-| 会话持久化 | jcode `crates/jcode-base/src/session/persistence.rs:68-75,317-393`（snapshot `.json` + 增量 `.journal.jsonl`）；opencode `packages/schema/src/session-message.ts:12-212`（消息 tagged union 契约） |
+| 会话持久化 | **已定：JSONL 条目树**，见 `plans/runtime-boundary/README.md` 第 7 节第 8 条与 `crates/agent/src/session/`。抄源 oh-my-pi `packages/coding-agent/src/session/session-entries.ts:58-62,245-260`；jcode `crates/jcode-base/src/session/persistence.rs:66-125`（坏行只跳该行）仍然照抄；消息 tagged union 契约参考 opencode `packages/schema/src/session-message.ts:12-212` |
 | 上下文压缩 | jcode `crates/jcode-compaction-core/src/lib.rs:6,9,13,19,43,58,63`（200k 预算、0.80 触发 / 0.95 紧急、保留近 10 turn、chars÷4 估 token（函数体 `:389-400`）、图像定额 1600、系统开销 18k） |
 | 工具输出统一截断 | oh-my-pi `packages/coding-agent/src/session/streaming-output.ts:10-12`（3000 行 / 50KB / 512 列 + artifact 外溢） |
 | read 工具分页与结构摘要 | oh-my-pi `packages/coding-agent/src/tools/read.ts:148-164,420-421,2699-2701`、`packages/coding-agent/src/config/settings-schema.ts:3258-3350` |
 | grep 分页与大文件窗 | oh-my-pi `packages/coding-agent/src/tools/grep.ts:91-126`（20 文件 × 20 匹配、4MiB 窗、30s 超时）；引擎进程内而非 fork `rg` |
 | bash 工具边界 | jcode `crates/jcode-app-core/src/tool/bash.rs:26-27,539-543,742,884-937`（30000 **字节**头部截断、默认 120s / 上限 600s 钳制、超时不杀而是把持有 `Child` 的 `JoinHandle` 交给 background manager 收养）+ `crates/jcode-app-core/src/agent/tools.rs:5-19`（入历史前二次 512KiB cap）。**已知债，不要抄**：前台路径没有 setpgid（对比后台 `bash.rs:1113-1122`），取消时只杀 `bash -c` 本身，孙进程成孤儿；且同一个 `timeout` 字段在前台/后台语义相反（`bash.rs:1161-1214`） |
-| 权限模型 | jcode `crates/jcode-base/src/safety.rs:55-199`（审批队列）；opencode `packages/protocol/src/groups/permission.ts:21-125`（有序 allow/deny/**ask** ruleset，V2 已废弃布尔 tools map） |
+| 权限模型 | **已定：tier × policy + opencode 式回环**，见 `plans/runtime-boundary/README.md` 第 7 节第 10 条与 `crates/agent/src/approval.rs`。裁决表抄 oh-my-pi `packages/coding-agent/src/tools/approval.ts:29-185`；回环（always 连锁 / reject 连坐 / 每次结算广播）抄 opencode `packages/opencode/src/permission/index.ts:98-167`。**不要再实现有序 allow/deny/ask ruleset**（`:28-38`），本仓已显式否决 |
 | TUI 重绘节流 | jcode `crates/jcode-tui/src/tui/redraw_schedule.rs:16-20,211-214`（idle 250ms / deep-idle 5s / spinner 80ms / resize debounce 33ms） |
 | TUI 缓存 | jcode `crates/jcode-tui-messages/src/cache.rs:8-59`（消息行 LRU 2048）、`crates/jcode-tui/src/tui/ui.rs:912-916`（BodyCache 8 条 / 32MiB） |
 | 流式 reveal 节奏 | jcode `crates/jcode-tui-core/src/stream_buffer.rs:30-51`（到达≠显示，180→960 cps）；oh-my-pi 50ms 批 / ≤20 updates·s⁻¹，文本 reveal 30fps |

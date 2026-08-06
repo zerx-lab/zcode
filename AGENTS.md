@@ -54,9 +54,15 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 - `crates/utils/src/env.rs` — worker 子进程重入 CLI 的路径解析：`declare_worker_host_entry` / `worker_host_entry`
 - `crates/ai/src/auth/store.rs` — 凭据文件落在用户主目录的 `.zcode` 下，`ZCODE_AUTH_FILE` 可覆盖；读-改-写全程持排他文件锁 + OAuth 刷新走 CAS。别退回"无锁整文件重写"：多进程并发刷新会丢轮换后的 refresh token
 - `crates/ai/src/http.rs` — 全 crate 唯一的 `reqwest` 客户端。TLS 走 `rustls-no-provider` + ring 并在建 Client 前装 provider：默认的 `rustls` feature 会拖进 aws-lc-sys（需 NASM/CMake）。同理不用 `dirs`（依赖 MPL-2.0 的 option-ext，被 `deny.toml` 挡）
+- `crates/agent/src/session/` — 会话持久化 = **JSONL 条目树**（`parent_id` 成树，上下文 = 根到 head 的路径，`/branch` 与 `/rewind` 只换 head）。已否决 snapshot+journal 与 SQLite 事件溯源，取舍见 `plans/runtime-boundary/README.md` 第 7 节
+- `crates/agent/src/approval.rs` — 审批 = **tier × policy，默认 yolo**；`always` 的授权键是 `(工具名, 工具声明的作用域)`。已显式否决有序 allow/deny/ask ruleset，别再造一套
+- `crates/agent/src/interrupt.rs` — `InterruptSignal`（AtomicBool + epoch + Notify）。持有它的 turn 结束时**必须自己 reset**，没有别人会清；不清则下一个 turn 秒退
 - `crates/catalog/src/models.json` — 生成物；源头、生成命令与可复现前提见 `rule://zcode-architecture`
 - `crates/catalog/src/effort.rs` — `Effort` 是 workspace 唯一的推理档位类型，`zcode-ai` 只 re-export；`Effort::Off` 的线上值是 `"none"`
 - `crates/text/src/width.rs`、`crates/text/src/truncate.rs`、`crates/text/src/path.rs` — 显示宽度 / 输出截断 / 路径脱敏的唯一实现，渲染点一律调它们；要求见 `rule://zcode-architecture` 的「TUI 输出清理」
+- `crates/tui/src/emit.rs` — 四条发射路径的调度器，也是全 crate 唯一发 ED3（`CSI 3J`）的地方；改渲染路径前先读 `crates/tui/src/lib.rs` 顶部的五条不变量
+- `crates/tui/src/terminal.rs` — fork 自 codex 的 `Terminal`，但 `draw` 只发相对光标移动（上游发绝对 `MoveTo`）：绝对定位会把已向上滚动的读者拽回底部
+- `crates/tui/src/wrap.rs` — `line_rows` 与 `wrap_line` 必须共用同一套贪心切分；行数被 `insert_history` 用来推进 viewport 锚点，算术公式会少记行
 - `crates/schema/src/compile.rs` — JSON Schema 校验是 fail-closed：schema 形状非法或 `pattern` 编译不了都在 `compile` 期报错，绝不降级成跳过约束
 - `.github/workflows/ci.yml` — 闸门编排：fmt、三平台 clippy/test、cross-check（目标清单以该 workflow 为准）、MSRV（从 `rust-version` 读）、docs、deny、machete、index-guard
 - `.github/dependabot.yml` — cargo 与 actions 每周更新，次版本/补丁合并成一个 PR
@@ -97,4 +103,4 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 **维护动作**：`/sync-index` 派 `index-keeper` 与代码对账，补新坐标并删过时条目。
 锚指向最后一次与索引对过账的 commit；`/sync-index` 负责推进它。
 
-<!-- index-verified: 2c7fa20 2026-08-06 -->
+<!-- index-verified: 03b21e9 2026-08-06 -->

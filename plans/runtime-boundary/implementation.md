@@ -44,9 +44,19 @@ assumptions"（`docs/HARNESS_API_AND_DESKTOP_REWRITE.md:5-10`），于是又叠�
 - **权限审批**：`Request::PermissionReply` / `Event::PermissionAsked` +
   **`Request::PermissionList`（重连必调）**。opencode 有前两条、漏了第三条，后果是 SSE
   在询问后断开则服务端工具永久挂着而 UI 无显示。
-  ruleset 语义抄 opencode `packages/opencode/src/permission/index.ts:28-38,131-165`：
-  有序 allow/deny/ask、`findLast`（后写覆盖先写）、`always` 连锁放行同 session 其他 pending、
-  `reject` 连坐、每次结算都推 `permission.replied` 让所有客户端同步移除 UI。
+
+  **裁决变更（用户拍板）**：规则模型**不用** opencode 的有序 allow/deny/ask ruleset，
+  改用 oh-my-pi 的 **tier × policy**（`packages/coding-agent/src/tools/approval.ts:29-185`），
+  默认模式 `yolo`。理由：ruleset 表达力更强但默认 `ask`，开箱即用每个工具都弹窗；
+  本仓面向单人 power-user。已落地在 `crates/agent/src/approval.rs`，
+  wire 变体按那里的 `Tier` / `Policy` / `ApprovalMode` / `ApprovalReply` 映射，
+  **不要再实现一套 ruleset**。
+
+  **回环语义仍照抄 opencode**（`packages/opencode/src/permission/index.ts:98-167`）：
+  oneshot-by-request-id、`always` 连锁放行同作用域的其余 pending、`reject` 连坐、
+  每次结算都推 replied 让所有客户端同步移除 UI。与上游的差异是 `always` 的键是
+  `(工具名, 工具声明的作用域)` 而非 `permission + patterns`——本仓没有 pattern 维度，
+  作用域由工具自己收窄（`bash` 可返回 `bash:git`）。
 - **stdin 回环**：工具执行中要用户输入时的 oneshot-by-request-id
   （jcode `server/client_lifecycle.rs:633-666` + `wire.rs:347-356`）。这与权限审批是同一个机制。
 - **`Event::Resync`**：`broadcast` 慢消费者 `RecvError::Lagged` 时**不断流**，
