@@ -1,12 +1,16 @@
 import * as os from "node:os";
 import * as path from "node:path";
 import { getAgentDir, isEnoent, logger, prompt } from "@oh-my-pi/pi-utils";
+import { BRAND_PROJECT_CONFIG_DIR_NAMES } from "@oh-my-pi/pi-utils/brand";
 import { expandAtImports } from "../discovery/at-imports";
 import activeRepoWatchdogTemplate from "../prompts/advisor/active-repo-watchdog.md" with { type: "text" };
 import contextFilesTemplate from "../prompts/advisor/context-files.md" with { type: "text" };
 import type { ActiveRepoContext } from "../utils/active-repo-context";
 import { repo } from "../utils/git";
 import { normalizePromptPath } from "../utils/prompt-path";
+
+/** Project config dir names probed for watchdog/advisor files (native + fork compat). */
+const PROJECT_CONFIG_DIR_NAMES = BRAND_PROJECT_CONFIG_DIR_NAMES;
 
 export function formatActiveRepoWatchdogPrompt(activeRepoContext: ActiveRepoContext): string {
 	return prompt
@@ -80,7 +84,9 @@ export async function collectConfigCandidates(
 	let current = cwd;
 	while (true) {
 		for (const filename of filenames) {
-			candidates.add(path.resolve(current, ".omp", filename));
+			for (const configDirName of PROJECT_CONFIG_DIR_NAMES) {
+				candidates.add(path.resolve(current, configDirName, filename));
+			}
 			candidates.add(path.resolve(current, filename));
 		}
 		if (current === (repoRoot ?? home)) break;
@@ -96,9 +102,9 @@ export async function collectConfigCandidates(
 			const parent = path.dirname(candidate);
 			const baseName = parent.split(path.sep).pop() ?? "";
 			const isUser = userPaths.has(candidate);
-			const ownerDir = baseName === ".omp" ? path.dirname(parent) : parent;
+			const ownerDir = PROJECT_CONFIG_DIR_NAMES.includes(baseName) ? path.dirname(parent) : parent;
 			const ownerBaseName = ownerDir.split(path.sep).pop() ?? "";
-			if (isUser || !ownerBaseName.startsWith(".") || baseName === ".omp") {
+			if (isUser || !ownerBaseName.startsWith(".") || PROJECT_CONFIG_DIR_NAMES.includes(baseName)) {
 				const relative = path.relative(cwd, ownerDir);
 				const depth = relative === "" ? 0 : relative.split(path.sep).filter(Boolean).length;
 				items.push({ path: candidate, content, level: isUser ? "user" : "project", depth });

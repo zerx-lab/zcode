@@ -1,4 +1,5 @@
 import { padding, truncateToWidth, visibleWidth } from "@oh-my-pi/pi-tui";
+import { APP_NAME } from "@oh-my-pi/pi-utils";
 import { gradientEscape, gradientLogo, PI_LOGO, type ShineConfig } from "../../components/welcome";
 import { theme } from "../../theme/theme";
 
@@ -189,7 +190,7 @@ export function renderSetupSplash(width: number, height: number, elapsedMs: numb
 /** Centered fallback for windows too small to hold the full scene. */
 function renderCompactSplash(width: number, height: number, phase: number, shine: ShineConfig): string[] {
 	const art = height >= 14 ? LARGE_LOGO : PI_LOGO;
-	const content = [...gradientLogo(art, phase, shine), "", theme.bold("O h   M y   P i")];
+	const content = [...gradientLogo(art, phase, shine), "", theme.bold([...APP_NAME.toUpperCase()].join("   "))];
 	const start = Math.max(0, Math.floor((height - content.length) / 2));
 	const lines: string[] = [];
 	for (let y = 0; y < height; y++) {

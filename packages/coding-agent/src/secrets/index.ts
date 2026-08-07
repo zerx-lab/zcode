@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { SENSITIVE_TOKEN_RE } from "@oh-my-pi/pi-ai/providers/transform-messages";
 import { getSecretPlaceholderKeyPath, isEnoent, logger } from "@oh-my-pi/pi-utils";
+import { BRAND_PROJECT_CONFIG_DIR_NAMES } from "@oh-my-pi/pi-utils/brand";
 import { YAML } from "bun";
 import { type SecretEntry, SecretObfuscator } from "./obfuscator";
 import { sanitizeSecretFriendlyName, secretEntriesNeedPlaceholderKey } from "./placeholder";
@@ -162,12 +163,24 @@ export { secretEntriesNeedPlaceholderKey, secretEntryNeedsPlaceholderKey } from 
  * Load secrets from project-local and global secrets.yml files.
  * Project-local entries override global entries with matching content.
  */
+/** Last occurrence wins: later (higher-priority) lists override earlier ones by content. */
+function dedupeByContent(entries: SecretEntry[]): SecretEntry[] {
+	const byContent = new Map<string, SecretEntry>();
+	for (const entry of entries) byContent.set(entry.content, entry);
+	return [...byContent.values()];
+}
+
 export async function loadSecrets(cwd: string, agentDir: string): Promise<SecretEntry[]> {
-	const projectPath = path.join(cwd, ".omp", "secrets.yml");
 	const globalPath = path.join(agentDir, "secrets.yml");
 
 	const globalEntries = await loadSecretsFile(globalPath);
-	const projectEntries = await loadSecretsFile(projectPath);
+	// Probe native dir first, compat dirs as fallback; later (higher-priority) entries override by content.
+	const projectLists = await Promise.all(
+		[...BRAND_PROJECT_CONFIG_DIR_NAMES]
+			.reverse()
+			.map(dirName => loadSecretsFile(path.join(cwd, dirName, "secrets.yml"))),
+	);
+	const projectEntries = dedupeByContent(projectLists.flat());
 
 	if (globalEntries.length === 0) return projectEntries;
 	if (projectEntries.length === 0) return globalEntries;

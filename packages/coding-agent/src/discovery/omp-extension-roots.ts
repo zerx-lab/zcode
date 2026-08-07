@@ -19,6 +19,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { getAgentDir, isEnoent, logger, tryParseJson } from "@oh-my-pi/pi-utils";
+import { BRAND_PROJECT_CONFIG_DIR_NAMES } from "@oh-my-pi/pi-utils/brand";
 import { readDirEntries, readFile } from "../capability/fs";
 import type { LoadContext } from "../capability/types";
 import { getEnabledPlugins } from "../extensibility/plugins/loader";
@@ -126,13 +127,13 @@ export function getInjectedOmpExtensionCliRoots(): readonly OmpExtensionRoot[] {
 }
 
 interface ScopeDirs {
-	project: string;
+	projects: string[];
 	user: string;
 }
 
 function scopeDirs(ctx: LoadContext): ScopeDirs {
 	return {
-		project: path.join(ctx.cwd, ".omp"),
+		projects: BRAND_PROJECT_CONFIG_DIR_NAMES.map(dirName => path.join(ctx.cwd, dirName)),
 		user: getAgentDir(),
 	};
 }
@@ -193,12 +194,13 @@ export async function listOmpExtensionRoots(ctx: LoadContext): Promise<OmpExtens
 				root.relativePath ? { ...root, path: path.resolve(ctx.cwd, root.relativePath) } : root,
 			);
 	if (rootMode === "merge") {
-		const { project, user } = scopeDirs(ctx);
-		const [projectExtensions, userExtensions, installedPlugins] = await Promise.all([
-			readSettingsExtensions(path.join(project, "settings.json")),
+		const { projects, user } = scopeDirs(ctx);
+		const [projectExtensionLists, userExtensions, installedPlugins] = await Promise.all([
+			Promise.all(projects.map(project => readSettingsExtensions(path.join(project, "settings.json")))),
 			readSettingsExtensions(path.join(user, "settings.json")),
 			listInstalledPluginRoots(ctx),
 		]);
+		const projectExtensions = projectExtensionLists.flat();
 		candidates = [
 			...candidates,
 			...projectExtensions.map((raw): InjectedRoot => ({ path: resolveAgainst(raw, ctx), level: "project" })),

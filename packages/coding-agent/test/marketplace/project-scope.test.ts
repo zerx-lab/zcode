@@ -24,7 +24,7 @@ import {
 	readInstalledPluginsRegistry,
 	writeInstalledPluginsRegistry,
 } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/marketplace";
-import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+import { getConfigDirName, removeSyncWithRetries } from "@oh-my-pi/pi-utils";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ describe("resolveActiveProjectRegistryPath", () => {
 
 		const result = await resolveActiveProjectRegistryPath(cwd);
 
-		expect(result).toBe(path.join(tmpDir, ".omp", "plugins", "installed_plugins.json"));
+		expect(result).toBe(path.join(tmpDir, getConfigDirName(), "plugins", "installed_plugins.json"));
 	});
 
 	it("returns null when neither .omp/ nor .git/ found anywhere in the tree", async () => {

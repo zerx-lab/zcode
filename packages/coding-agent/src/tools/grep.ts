@@ -339,7 +339,7 @@ interface IndexedContentLines {
 	starts: number[];
 }
 
-const OMP_ROOT_URL_RE = /^omp:\/\/(?:\/?|docs\/?)$/i;
+const OMP_ROOT_URL_RE = /^(omp|zcode):\/\/(?:\/?|docs\/?)$/i;
 
 function normalizeSearchLine(line: string): string {
 	return line.endsWith("\r") ? line.slice(0, -1) : line;
@@ -739,15 +739,17 @@ async function expandVirtualInternalResource(
 	context: ResolveContext,
 	ranges: readonly LineRange[] | undefined,
 ): Promise<VirtualSearchResource[]> {
-	if (OMP_ROOT_URL_RE.test(rawPath)) {
-		const completions = await internalRouter.complete("omp", "");
+	const rootMatch = OMP_ROOT_URL_RE.exec(rawPath);
+	if (rootMatch) {
+		const docsScheme = rootMatch[1].toLowerCase();
+		const completions = await internalRouter.complete(docsScheme, "");
 		if (completions && completions.length > 0) {
 			const resources: VirtualSearchResource[] = [];
 			const seen = new Set<string>();
 			for (const completion of completions) {
 				if (seen.has(completion.value)) continue;
 				seen.add(completion.value);
-				const docUrl = `omp://${completion.value}`;
+				const docUrl = `${docsScheme}://${completion.value}`;
 				const doc = await internalRouter.resolve(docUrl, context);
 				if (!doc.sourcePath) {
 					resources.push({ path: docUrl, content: doc.content, ranges });

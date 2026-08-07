@@ -26,6 +26,7 @@ import { skillCapability } from "@oh-my-pi/pi-coding-agent/capability/skill";
 import { slashCommandCapability } from "@oh-my-pi/pi-coding-agent/capability/slash-command";
 import { toolCapability } from "@oh-my-pi/pi-coding-agent/capability/tool";
 import type { LoadContext, Provider } from "@oh-my-pi/pi-coding-agent/capability/types";
+import { getConfigDirName } from "@oh-my-pi/pi-utils";
 // Register all discovery providers as a side effect.
 import "@oh-my-pi/pi-coding-agent/discovery";
 import {
@@ -181,7 +182,7 @@ test("explicit-only CLI roots replace stale state and exclude every ambient pack
 	const stale = path.join(tempDir, "stale-extension");
 	const projectExt = path.join(tempDir, "project-extension");
 	const userExt = path.join(tempDir, "user-extension");
-	const installed = path.join(home, ".omp", "plugins", "node_modules", "installed-extension");
+	const installed = path.join(home, getConfigDirName(), "plugins", "node_modules", "installed-extension");
 	buildExtensionPackage(stale, "stale-skill");
 	buildExtensionPackage(projectExt, "project-skill");
 	buildExtensionPackage(userExt, "user-skill");
@@ -189,7 +190,7 @@ test("explicit-only CLI roots replace stale state and exclude every ambient pack
 	writeFile(path.join(project, ".omp", "settings.json"), JSON.stringify({ extensions: [projectExt] }));
 	writeFile(path.join(home, ".omp", "agent", "settings.json"), JSON.stringify({ extensions: [userExt] }));
 	writeFile(
-		path.join(home, ".omp", "plugins", "package.json"),
+		path.join(home, getConfigDirName(), "plugins", "package.json"),
 		JSON.stringify({ name: "omp-plugins", dependencies: { "installed-extension": "1.0.0" } }),
 	);
 
@@ -217,7 +218,7 @@ test("explicit-only CLI roots replace stale state and exclude every ambient pack
 test("invocation scopes isolate concurrent SDK roots and merge ambient roots only when requested", async () => {
 	const otherExplicit = path.join(tempDir, "other-explicit-extension");
 	const projectExt = path.join(tempDir, "project-extension");
-	const installed = path.join(home, ".omp", "plugins", "node_modules", "installed-extension");
+	const installed = path.join(home, getConfigDirName(), "plugins", "node_modules", "installed-extension");
 	const staleCli = path.join(tempDir, "stale-cli-extension");
 	buildExtensionPackage(otherExplicit, "other-explicit-skill");
 	buildExtensionPackage(projectExt, "project-skill");
@@ -225,7 +226,7 @@ test("invocation scopes isolate concurrent SDK roots and merge ambient roots onl
 	buildExtensionPackage(staleCli, "stale-cli-skill");
 	writeFile(path.join(project, ".omp", "settings.json"), JSON.stringify({ extensions: [projectExt] }));
 	writeFile(
-		path.join(home, ".omp", "plugins", "package.json"),
+		path.join(home, getConfigDirName(), "plugins", "package.json"),
 		JSON.stringify({ name: "omp-plugins", dependencies: { "installed-extension": "1.0.0" } }),
 	);
 	injectOmpExtensionCliRoots([staleCli], home, project);
@@ -332,7 +333,7 @@ test("path-like command stays rooted at the plugin package root even with a subd
 test("installed plugins under `<plugins>/node_modules/` are surfaced (e.g. via `omp plugin link`/`install`)", async () => {
 	// Simulate what `plugin install` / `plugin link` produces: a plugins root
 	// with `package.json#dependencies` and a populated `node_modules/<pkg>/`.
-	const pluginsDir = path.join(home, ".omp", "plugins");
+	const pluginsDir = path.join(home, getConfigDirName(), "plugins");
 	const nodeModules = path.join(pluginsDir, "node_modules");
 	const installed = path.join(nodeModules, "my-installed-ext");
 	fs.mkdirSync(installed, { recursive: true });
@@ -372,7 +373,7 @@ test("project-scoped installed plugins surface project-level sub-discovery", asy
 });
 
 test("disabled installed plugins do not contribute sub-discovery", async () => {
-	const pluginsDir = path.join(home, ".omp", "plugins");
+	const pluginsDir = path.join(home, getConfigDirName(), "plugins");
 	const installed = path.join(pluginsDir, "node_modules", "my-disabled-ext");
 	fs.mkdirSync(installed, { recursive: true });
 	fs.cpSync(ext, installed, { recursive: true });
@@ -396,7 +397,7 @@ test("linked plugins (only in lockfile, not in package.json#dependencies) are su
 	// still find the package — otherwise the documented `omp install
 	// ./local-extension` workflow leaves the sibling skills/hooks/tools
 	// invisible (see PR #1498 review).
-	const pluginsDir = path.join(home, ".omp", "plugins");
+	const pluginsDir = path.join(home, getConfigDirName(), "plugins");
 	const nodeModules = path.join(pluginsDir, "node_modules");
 	fs.mkdirSync(nodeModules, { recursive: true });
 	const linkTarget = path.join(nodeModules, "my-linked-ext");
