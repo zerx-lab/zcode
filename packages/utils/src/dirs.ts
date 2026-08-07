@@ -16,11 +16,13 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { engines, version } from "../package.json" with { type: "json" };
 
+import { BRAND_APP_NAME, BRAND_CONFIG_DIR_NAME, resolveProjectConfigFileIn } from "./brand";
+
 /** App name (e.g. "omp") */
-export const APP_NAME: string = "omp";
+export const APP_NAME: string = BRAND_APP_NAME;
 
 /** Config directory name (e.g. ".omp") */
-export const CONFIG_DIR_NAME: string = ".omp";
+export const CONFIG_DIR_NAME: string = BRAND_CONFIG_DIR_NAME;
 
 /** Ordered main settings filenames: canonical write target first, legacy-compatible YAML fallback second. */
 export const MAIN_CONFIG_FILENAMES = ["config.yml", "config.yaml"] as const;
@@ -29,7 +31,7 @@ export const MAIN_CONFIG_FILENAMES = ["config.yml", "config.yaml"] as const;
 export const VERSION: string = version;
 
 /** Default User-Agent header string (e.g. "omp/17.2.12") */
-export const USER_AGENT = `omp/${VERSION}`;
+export const USER_AGENT = `${APP_NAME}/${VERSION}`;
 
 /** Minimum Bun version */
 export const MIN_BUN_VERSION: string = engines.bun.replace(/[^0-9.]/g, "");
@@ -908,7 +910,7 @@ export function getMCPConfigPath(scope: "user" | "project", cwd: string = getPro
 	if (scope === "user") {
 		return path.join(getAgentDir(), "mcp.json");
 	}
-	return path.join(getProjectAgentDir(cwd), "mcp.json");
+	return resolveProjectConfigFileIn(cwd, "mcp.json");
 }
 
 /** Get the SSH config file path. */
@@ -916,7 +918,7 @@ export function getSSHConfigPath(scope: "user" | "project", cwd: string = getPro
 	if (scope === "user") {
 		return path.join(getAgentDir(), "ssh.json");
 	}
-	return path.join(getProjectAgentDir(cwd), "ssh.json");
+	return resolveProjectConfigFileIn(cwd, "ssh.json");
 }
 
 // =============================================================================

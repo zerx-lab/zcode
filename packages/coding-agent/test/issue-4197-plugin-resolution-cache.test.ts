@@ -8,7 +8,7 @@ import {
 	__rewriteLegacyExtensionSourceForTests,
 } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/legacy-pi-compat";
 import { getEnabledPlugins } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/loader";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { getConfigDirName, removeWithRetries } from "@oh-my-pi/pi-utils";
 
 const tempRoots: string[] = [];
 
@@ -30,7 +30,7 @@ test("getEnabledPlugins caches repeated discovery for the same cwd and home unti
 	tempRoots.push(root);
 	const home = path.join(root, "home");
 	const cwd = path.join(root, "project");
-	const pluginsDir = path.join(home, ".omp", "plugins");
+	const pluginsDir = path.join(home, getConfigDirName(), "plugins");
 	const pluginPackageJson = path.join(pluginsDir, "node_modules", "omp-cache-repro", "package.json");
 	await fs.mkdir(path.dirname(pluginPackageJson), { recursive: true });
 	await fs.mkdir(cwd, { recursive: true });

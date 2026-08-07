@@ -30,6 +30,8 @@ import {
 	setWorktreesDir,
 	toError,
 } from "@oh-my-pi/pi-utils";
+import { BRAND_PROJECT_CONFIG_DIR_NAMES } from "@oh-my-pi/pi-utils/brand";
+import { resolveProjectConfigFile } from "@oh-my-pi/pi-utils/brand-dirs";
 import { withFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { JSONC, YAML } from "bun";
 import { invalidate as invalidateCapabilityFsCache } from "../capability/fs";
@@ -331,6 +333,8 @@ export class Settings {
 	#project: RawSettings = {};
 	/** Last successfully loaded native .omp/config.yml contents. */
 	#projectFileSettings: RawSettings = {};
+	/** Sticky project config.yml path resolved at load; reused by saves. */
+	#projectConfigPath: string | undefined;
 	/** Logical config paths whose malformed targets were moved aside. */
 	#quarantinedYamlTargets = new Map<string, string>();
 	/** Extra config.yml-style overlays passed by CLI */
@@ -1245,9 +1249,21 @@ export class Settings {
 			// Capability discovery is best-effort; the native project config below
 			// remains authoritative for its model-role layer and must not be hidden.
 		}
-		const projectConfigPath = path.join(this.#cwd, ".omp", "config.yml");
+		// Sticky resolve: read/write the candidate config.yml that already exists
+		// (native first). Cached per load so later saves keep the same target even
+		// if the file is renamed away mid-session (e.g. corrupted-config backup).
+		const projectConfigPath = resolveProjectConfigFile("config.yml", this.#cwd);
+		this.#projectConfigPath = projectConfigPath;
 		const nativeProject = await this.#loadYaml(projectConfigPath);
 		this.#projectFileSettings = structuredClone(nativeProject);
+		for (const dirName of [...BRAND_PROJECT_CONFIG_DIR_NAMES].reverse()) {
+			const candidate = path.join(this.#cwd, dirName, "config.yml");
+			if (candidate === projectConfigPath) continue;
+			const compatRoles = getByPath(await this.#loadYaml(candidate), ["modelRoles"]);
+			if (compatRoles !== undefined) {
+				merged = this.#deepMerge(merged, { modelRoles: compatRoles });
+			}
+		}
 		const nativeModelRoles = getByPath(nativeProject, ["modelRoles"]);
 		if (nativeModelRoles !== undefined) {
 			merged = this.#deepMerge(merged, { modelRoles: nativeModelRoles });
@@ -2139,7 +2155,7 @@ export class Settings {
 	async #saveProjectNow(): Promise<void> {
 		if (this.#savesCancelled || !this.#persist || this.#modifiedProjectModelRoles.size === 0) return;
 
-		const projectConfigPath = path.join(this.#cwd, ".omp", "config.yml");
+		const projectConfigPath = this.#projectConfigPath ?? resolveProjectConfigFile("config.yml", this.#cwd);
 		const modifiedModelRoles = [...this.#modifiedProjectModelRoles];
 		this.#modifiedProjectModelRoles.clear();
 

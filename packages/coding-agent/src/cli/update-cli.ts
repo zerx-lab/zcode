@@ -11,15 +11,16 @@ import * as path from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { $env, $which, APP_NAME, compareVersions, isEnoent, VERSION } from "@oh-my-pi/pi-utils";
+import { BRAND_REPO } from "@oh-my-pi/pi-utils/brand";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { $ } from "bun";
 import { theme } from "../modes/theme/theme";
 import { isTimeoutError, withTimeoutSignal } from "../utils/fetch-timeout";
 
-const REPO = "can1357/oh-my-pi";
+const REPO = BRAND_REPO;
 const PACKAGE = "@oh-my-pi/pi-coding-agent";
-const HOMEBREW_FORMULA = "can1357/tap/omp";
-const MISE_TOOL = "github:can1357/oh-my-pi";
+const HOMEBREW_FORMULA = `${BRAND_REPO.split("/")[0]}/tap/${APP_NAME}`;
+const MISE_TOOL = `github:${BRAND_REPO}`;
 /**
  * Official npm registry origin.
  *

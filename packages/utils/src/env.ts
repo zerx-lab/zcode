@@ -183,10 +183,15 @@ export function parseEnvFile(filePath: string): Record<string, string> {
 		// File doesn't exist or can't be read - return empty result
 	}
 
-	// OMP_ overrides PI_
+	// ZCODE_ overrides OMP_ overrides PI_ (fork prefix first; see docs/fork/sync-strategy.md)
 	for (const k in result) {
 		if (k.startsWith("OMP_")) {
 			result[`PI_${k.slice(4)}`] = result[k];
+		}
+	}
+	for (const k in result) {
+		if (k.startsWith("ZCODE_")) {
+			result[`PI_${k.slice(6)}`] = result[k];
 		}
 	}
 
@@ -203,6 +208,14 @@ for (const key of Object.keys(Bun.env)) {
 	const value = Bun.env[key];
 	if (!isSafeEnvName(key) || isMacosMallocStackLoggingEnvName(key) || value === undefined || !isSafeEnvValue(value)) {
 		delete Bun.env[key];
+	}
+}
+
+// Live-env fork prefix: exported ZCODE_* maps to PI_* (upstream reads OMP_/PI_ per-callsite)
+for (const key of Object.keys(Bun.env)) {
+	if (key.startsWith("ZCODE_")) {
+		const target = `PI_${key.slice(6)}`;
+		if (Bun.env[target] === undefined) Bun.env[target] = Bun.env[key];
 	}
 }
 

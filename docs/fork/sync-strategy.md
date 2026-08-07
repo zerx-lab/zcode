@@ -134,6 +134,7 @@ brand/
 - [x] `fork` 分支 = upstream/main (ab78d3091) + `82436b0e9`（Windows native build 修复，原 `fix/windows-native-build`）
 - [x] `refs/brand/last-sync` = ab78d3091
 - [x] 本文档 + `brand/sync.sh`
-- [ ] `brand.ts` + 内联替换补丁（待品牌值确定：产品名 / 二进制名 / docs scheme / env 前缀 / 仓库路径）
-- [ ] `brand/apply.ts` + `verify.ts` + overlay 源
+- [x] `brand.ts` + 内联替换补丁 —— 品牌值：产品/二进制 `zcode`、配置目录 `~/.zcode`、scheme `zcode://`（`omp://` 隐藏别名）、env 前缀 `ZCODE_`（`OMP_` 保留）、仓库 `zerx-lab/oh-my-pi`。logo 暂不换（`PI_LOGO` 原样）
+- [ ] logo 更换（`welcome.ts` `PI_LOGO` + `assets/`，后续）
+- [ ] `brand/apply.ts` + `verify.ts` + overlay 源（README / install 脚本）
 - [ ] `release` 分支首次生成

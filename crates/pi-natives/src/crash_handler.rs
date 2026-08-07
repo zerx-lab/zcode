@@ -46,12 +46,12 @@ use std::{
 
 /// Default directory name for OMP's per-user state (overridable via
 /// `PI_CONFIG_DIR`, matching `packages/utils/src/dirs.ts`).
-const DEFAULT_CONFIG_DIR: &str = ".omp";
+const DEFAULT_CONFIG_DIR: &str = ".zcode";
 
 /// App name used as the XDG-root subdirectory (`$XDG_STATE_HOME/omp/`),
 /// matching `APP_NAME` in `packages/utils/src/dirs.ts`.
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-const APP_NAME: &str = "omp";
+const APP_NAME: &str = "zcode";
 
 static INSTALL: Once = Once::new();
 static ALLOC_HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
