@@ -6,6 +6,7 @@
  */
 import * as path from "node:path";
 import { getSSHConfigPath, tryParseJson } from "@oh-my-pi/pi-utils";
+import { getProjectAgentDirCandidates } from "@oh-my-pi/pi-utils/brand-dirs";
 import { registerProvider } from "../capability";
 import { readFile } from "../capability/fs";
 import { type SSHHost, sshCapability } from "../capability/ssh";
@@ -127,7 +128,10 @@ async function loadSshJsonFile(
 }
 async function load(ctx: LoadContext): Promise<LoadResult<SSHHost>> {
 	const candidateSources: Array<{ path: string; level: "user" | "project" }> = [
-		{ path: getSSHConfigPath("project", ctx.cwd), level: "project" },
+		...getProjectAgentDirCandidates(ctx.cwd).map(dir => ({
+			path: path.join(dir, "ssh.json"),
+			level: "project" as const,
+		})),
 		{ path: getSSHConfigPath("user", ctx.cwd), level: "user" },
 		{ path: path.join(ctx.cwd, "ssh.json"), level: "project" },
 		{ path: path.join(ctx.cwd, ".ssh.json"), level: "project" },

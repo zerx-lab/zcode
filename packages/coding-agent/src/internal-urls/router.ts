@@ -5,6 +5,7 @@
  * `InternalUrlRouter.instance()`. Handlers are stateless; per-session and
  * shared state lives in `./state.ts`.
  */
+import { BRAND_DOCS_SCHEME } from "@oh-my-pi/pi-utils/brand";
 import { AgentProtocolHandler } from "./agent-protocol";
 import { ArtifactProtocolHandler } from "./artifact-protocol";
 import { HistoryProtocolHandler } from "./history-protocol";
@@ -35,6 +36,9 @@ export class InternalUrlRouter {
 	#handlers = new Map<string, ProtocolHandler>();
 
 	constructor() {
+		// Fork: zcode:// is the primary docs scheme; omp:// stays as a hidden
+		// compatibility alias so upstream tests/docs keep working unchanged.
+		this.register(new OmpProtocolHandler(BRAND_DOCS_SCHEME));
 		this.register(new OmpProtocolHandler());
 		this.register(new AgentProtocolHandler());
 		this.register(new ArtifactProtocolHandler());

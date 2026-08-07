@@ -1,13 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {
-	getProjectDir,
-	getProjectPromptsDir,
-	getPromptsDir,
-	logger,
-	parseFrontmatter,
-	prompt,
-} from "@oh-my-pi/pi-utils";
+import { getProjectDir, getPromptsDir, logger, parseFrontmatter, prompt } from "@oh-my-pi/pi-utils";
+import { getProjectAgentDirCandidates } from "@oh-my-pi/pi-utils/brand-dirs";
 import { jtdToTypeScript } from "../tools/jtd-to-typescript";
 import { parseCommandArgs, substituteArgs } from "../utils/command-args";
 
@@ -173,9 +167,10 @@ export async function loadPromptTemplates(options: LoadPromptTemplatesOptions = 
 	const globalPromptsDir = options.agentDir ? path.join(options.agentDir, "prompts") : resolvedAgentDir;
 	templates.push(...(await loadTemplatesFromDir(globalPromptsDir, "user")));
 
-	// 2. Load project templates from cwd/.omp/prompts/
-	const projectPromptsDir = getProjectPromptsDir(resolvedCwd);
-	templates.push(...(await loadTemplatesFromDir(projectPromptsDir, "project")));
+	// 2. Load project templates from <project config dir>/prompts/ (native first, compat fallback)
+	for (const projectPromptsDir of getProjectAgentDirCandidates(resolvedCwd).map(dir => path.join(dir, "prompts"))) {
+		templates.push(...(await loadTemplatesFromDir(projectPromptsDir, "project")));
+	}
 
 	return templates;
 }

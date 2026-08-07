@@ -11,6 +11,7 @@ import {
 	parseFrontmatter,
 	tryParseJson,
 } from "@oh-my-pi/pi-utils";
+import { findExistingProjectConfigDirName } from "@oh-my-pi/pi-utils/brand-dirs";
 import type { ExtensionModule } from "../capability/extension-module";
 import { invalidate as invalidateFsCache, readDirEntries, readFile } from "../capability/fs";
 import { parseRuleConditionAndScope, type Rule, type RuleFrontmatter } from "../capability/rule";
@@ -825,13 +826,9 @@ export async function resolveActiveProjectRegistryPath(cwd: string): Promise<str
 	const homeDir = os.homedir();
 	let dir = path.resolve(cwd);
 	while (dir !== homeDir) {
-		try {
-			const stat = await fs.promises.stat(path.join(dir, getConfigDirName()));
-			if (stat.isDirectory()) {
-				return path.join(dir, getConfigDirName(), "plugins", "installed_plugins.json");
-			}
-		} catch {
-			// not found at this level — continue up
+		const existing = findExistingProjectConfigDirName(dir);
+		if (existing) {
+			return path.join(dir, existing, "plugins", "installed_plugins.json");
 		}
 		const parent = path.dirname(dir);
 		if (parent === dir) break; // filesystem root

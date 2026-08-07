@@ -5,6 +5,7 @@
  */
 import * as path from "node:path";
 import { getAgentDir, logger, parseFrontmatter, tryParseJson } from "@oh-my-pi/pi-utils";
+import { BRAND_COMPAT_PROJECT_CONFIG_DIRS } from "@oh-my-pi/pi-utils/brand";
 import { YAML } from "bun";
 import { getManagedSkillsDir, MANAGED_SKILLS_PROVIDER_ID } from "../autolearn/managed-skills";
 import { registerProvider } from "../capability";
@@ -58,9 +59,11 @@ async function ifNonEmptyDir(...seg: string[]): Promise<string | null> {
 async function getConfigDirs(ctx: LoadContext): Promise<Array<{ dir: string; level: "user" | "project" }>> {
 	const result: Array<{ dir: string; level: "user" | "project" }> = [];
 
-	const projectDir = await ifNonEmptyDir(ctx.cwd, PATHS.projectDir);
-	if (projectDir) {
-		result.push({ dir: projectDir, level: "project" });
+	for (const projectDirName of [PATHS.projectDir, ...BRAND_COMPAT_PROJECT_CONFIG_DIRS]) {
+		const projectDir = await ifNonEmptyDir(ctx.cwd, projectDirName);
+		if (projectDir) {
+			result.push({ dir: projectDir, level: "project" });
+		}
 	}
 	// Native user config is profile-scoped: getAgentDir() points at the active
 	// profile's agent dir (~/.omp/profiles/<name>/agent), like sessions and MCP.
@@ -92,8 +95,10 @@ async function findNearestProjectConfigDir(
 	repoRoot?: string | null,
 ): Promise<{ dir: string; depth: number } | null> {
 	for (const ancestor of getAncestorDirs(cwd, repoRoot)) {
-		const configDir = await ifNonEmptyDir(ancestor.dir, PATHS.projectDir);
-		if (configDir) return { dir: configDir, depth: ancestor.depth };
+		for (const dirName of [PATHS.projectDir, ...BRAND_COMPAT_PROJECT_CONFIG_DIRS]) {
+			const configDir = await ifNonEmptyDir(ancestor.dir, dirName);
+			if (configDir) return { dir: configDir, depth: ancestor.depth };
+		}
 	}
 	return null;
 }
@@ -204,8 +209,10 @@ async function loadMCPServers(ctx: LoadContext): Promise<LoadResult<MCPServer>> 
 	// stays in sync with getMCPConfigPath("user") and the /mcp config writer.
 	const userAgentDir = getAgentDir();
 	const paths = [
-		{ path: path.join(ctx.cwd, PATHS.projectDir, "mcp.json"), level: "project" as const },
-		{ path: path.join(ctx.cwd, PATHS.projectDir, ".mcp.json"), level: "project" as const },
+		...[PATHS.projectDir, ...BRAND_COMPAT_PROJECT_CONFIG_DIRS].flatMap(dirName => [
+			{ path: path.join(ctx.cwd, dirName, "mcp.json"), level: "project" as const },
+			{ path: path.join(ctx.cwd, dirName, ".mcp.json"), level: "project" as const },
+		]),
 		{ path: path.join(userAgentDir, "mcp.json"), level: "user" as const },
 		{ path: path.join(userAgentDir, ".mcp.json"), level: "user" as const },
 	];

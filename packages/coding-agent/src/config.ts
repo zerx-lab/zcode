@@ -2,12 +2,15 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { CONFIG_DIR_NAME, getConfigAgentDirName, getProjectDir } from "@oh-my-pi/pi-utils";
+import { BRAND_COMPAT_PROJECT_CONFIG_DIRS } from "@oh-my-pi/pi-utils/brand";
 import { expandTilde } from "./tools/path-utils";
 
 export * from "./config/config-file";
 
-const priorityList = [
+const priorityList: Array<{ dir: string; globalAgentDir?: () => string }> = [
 	{ dir: CONFIG_DIR_NAME, globalAgentDir: getConfigAgentDirName },
+	// Fork compat: keep discovering upstream-tracked / pre-existing .omp project config.
+	...BRAND_COMPAT_PROJECT_CONFIG_DIRS.map(dir => ({ dir })),
 	{ dir: ".claude" },
 	{ dir: ".codex" },
 	{ dir: ".gemini" },
