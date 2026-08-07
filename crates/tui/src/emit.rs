@@ -118,6 +118,9 @@ where
     env: HistoryEnv,
     wrap_policy: HistoryLineWrapPolicy,
     last_path: Option<EmitPath>,
+    /// 调用方请求的 pinned 值。账本里那份可能被本帧的溢出保护临时改掉，
+    /// 所以请求值必须单独留一份，否则下一帧恢复不回来。
+    pinned: bool,
 }
 
 impl<B> std::fmt::Debug for Emitter<B>
@@ -162,6 +165,7 @@ where
             },
             wrap_policy: HistoryLineWrapPolicy::PreWrap,
             last_path: None,
+            pinned: false,
         }
     }
 
@@ -205,7 +209,11 @@ where
     /// 固定高度仪表盘用 `true`；流式框用 `false` 并自己把高度钉进 viewport
     /// （`plans/tui/architecture.md:74-89` 记录了违反它的真实事故：框超出 viewport 时
     /// 可变尾部滚到 commit window 之上，每帧提交一份新快照，往 scrollback 堆重复 banner）。
+    ///
+    /// 这是**请求值**：活跃区高过整块屏幕时 [`Emitter::render`] 会本帧降级为
+    /// unpinned，理由见那里。
     pub fn set_pinned(&mut self, pinned: bool) {
+        self.pinned = pinned;
         self.ledger.set_pinned(pinned);
     }
 
@@ -232,13 +240,45 @@ where
         self.composer.reset();
     }
 
-    /// 渲染一帧。`viewport_height` 是调用方要求的活跃区高度，会被 clamp 到屏幕高度。
+    /// 收起活跃区，把光标停在它原来的顶行，让后续输出（通常是 shell 提示符）
+    /// 从一片干净的地方开始。
     ///
-    /// 返回本帧实际走的路径。
+    /// **退出路径必须调它。** 活跃区里画的是输入框、状态行这类"还会变"的东西，它们
+    /// 从来没被提交进 scrollback；进程一走，这些字节就原样烙在终端上——用户会看到
+    /// shell 提示符下方挂着半个圆角框，且框的 SGR 还没关，后面每一行都染上边框色。
+    ///
+    /// 已经提交进 scrollback 的 transcript 不受影响：这里只清 viewport 及其下方，
+    /// 那是本来就属于活跃区的区域。
+    ///
+    /// # Errors
+    ///
+    /// 终端写入失败。调用方通常在 `Drop` 里调它，只记日志、不传播——退出路径要尽力
+    /// 把终端还原，一步失败不该连累后面几步。
+    pub fn shutdown(&mut self) -> io::Result<()> {
+        let top = self.terminal.viewport_area().as_position();
+        self.terminal.clear_after_position(top)?;
+        Write::flush(self.terminal.backend_mut())?;
+        Ok(())
+    }
+
+    /// 渲染一帧。返回本帧实际走的路径。
+    ///
+    /// # 活跃区高度不是调用方给的
+    ///
+    /// 它由 [`ComposeOutcome::boundary`] 决定：`total_rows - boundary` 恰好是「第一条
+    /// 仍可能变化的行到帧尾」的行数。`min_viewport_height` 只是**下限**，给那种
+    /// 「框高度固定、内容在框里滚动」的调用方用；正常 transcript 客户端传 `1` 即可。
+    ///
+    /// 早期版本让调用方自己数活跃区行数，那是个错误设计：调用方要把状态行、弹窗、
+    /// 输入框、仍在直播的块各渲染一遍才能数出行数——既是双倍渲染成本，又必然与
+    /// `compose` 的实际结果漂移。漂移一旦发生，viewport 装不下活跃内容，顶部几行
+    /// 既没进历史也没画进窗口，表现是**消息凭空消失**，且不会自愈。
+    ///
+    /// 唯一的事实来源只能是 `compose` 自己刚算出来的那份行账本。
     pub fn render(
         &mut self,
         components: &[&dyn Component],
-        viewport_height: u16,
+        min_viewport_height: u16,
     ) -> io::Result<EmitPath> {
         if self.terminal.autoresize()? {
             // 终端尺寸变了：composer 的缓存按旧宽度渲染，账本的 W 也按旧高度算过，
@@ -262,7 +302,33 @@ where
             return self.emit_plain(outcome.boundary);
         }
 
-        let height = viewport_height.clamp(1, screen.height.max(1));
+        // 活跃区 = 从 boundary 到帧尾。`total_rows >= boundary` 由 `compose` 保证
+        // （boundary 取自某个组件的起始行 + 它自报的偏移，已 clamp 到该组件行数）。
+        let live_rows =
+            u16::try_from(outcome.total_rows.saturating_sub(outcome.boundary)).unwrap_or(u16::MAX);
+        let requested = live_rows.max(min_viewport_height);
+        let height = requested.clamp(1, screen.height.max(1));
+
+        // **活跃区比整块屏幕还高**：`height` 被 clamp 到屏幕高度，于是
+        // `W = L - height > B`。pinned 分支把 `commit_end` 卡在 `B`
+        // （`ledger.rs:157-158`），`[B, W)` 这段就既没进 scrollback、也没落在窗口里
+        // ——凭空消失，而且不会自愈。
+        //
+        // 屏幕装不下的东西必须有个去处，本引擎的既定取舍是 duplication, never loss
+        // （`ledger.rs:20-27`）：本帧降级 unpinned，让滚出窗口的可变行以"滚出那一刻的
+        // 样子"作为冻结快照提交进历史。代价是这些行之后不可再改写；收益是它们还在。
+        //
+        // 只改账本里那份，不动 `self.pinned`：下一帧一旦装得下就自动恢复 pinned。
+        let fits = requested <= screen.height.max(1);
+        if self.pinned && !fits {
+            tracing::debug!(
+                live_rows,
+                screen_height = screen.height,
+                "活跃区高于屏幕，本帧降级 unpinned 以免丢行"
+            );
+        }
+        self.ledger.set_pinned(self.pinned && fits);
+
         self.sync_viewport_geometry(width, height);
         let rows = usize::from(height);
 

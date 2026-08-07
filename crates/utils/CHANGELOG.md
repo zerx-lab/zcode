@@ -31,6 +31,9 @@
     临时端点，子进程在监听可 accept 之后连上来回写令牌。**不用注册文件**（只证明"曾写入"，
     不与本次 spawn 绑定，且 PID 可复用）、**不用 stdout 文本匹配**（opencode 的反例，
     格式一改就断）。等待期间每轮 `try_wait` 子进程，崩溃立即报错而不是等满 120s。
+    端点文件名用一段独立的短随机 slug，**不含令牌**：macOS 的 `sun_path` 只有 104 字节，
+    临时目录前缀加 43 字符的 base64 令牌会直接 `InvalidInput`；且 Windows named pipe 名字
+    对本机任意进程可见，令牌进名字等于把唯一防线公开。
   - `Secret` / `Nonce` / `proof` / `verify_proof`：daemon 握手的 HMAC-SHA256 双向挑战应答，
     带域分隔串防反射。`Secret` 的 `Debug` 手写成 `<redacted>`——进日志一次就是泄露。
 
@@ -39,3 +42,11 @@
 - `transport::stream_pair`（Unix 侧）的 `#[expect(clippy::unused_async)]` 改为 `#[allow(...)]`：
   该 lint 会被 `mod.rs` 的 `pub use ... stream_pair` 当成"async fn 被当值使用"而整体静默
   （clippy#13466 同一机制），expect 于是永不满足，在 `cfg(unix)` 上被 `-D warnings` 打成错误。
+- **`transport::windows::Listener::accept` 现在是取消安全的。** 旧实现在第一次 poll、
+  任何 `await` 之前就 `self.idle.take()`；调用方普遍会把它塞进 `tokio::time::timeout`
+  或 `select!`（`daemon::ReadyChannel::wait` 正是每 50 ms 轮一次，好在等待期间
+  `try_wait` 子进程），future 一被丢弃空闲 pipe 实例就永久丢失，**下一次 accept 必然
+  `BrokenPipe`**——症状是 `zcode` 拉起 daemon 时立刻失败。现在 `idle` 只在 `connect()`
+  成功返回之后才取走（`NamedPipeServer::connect` 本身由 tokio 保证取消安全）。
+  回归测试 `transport::tests::accept_stays_usable_after_being_cancelled` 对两个平台都跑。
+  这条是**真机跑二进制**发现的：单元测试当时全绿，因为没有一条在超时里调用过 accept。

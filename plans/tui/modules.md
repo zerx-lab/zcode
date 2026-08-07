@@ -3,8 +3,8 @@
 ## 文件结构
 
 ```
-src/tui/
-  mod.rs
+src/
+  lib.rs
   caps.rs             # 能力探测 + Windows VT 启用       [#cfg(windows) 分支]
   terminal.rs         # fork ratatui::Terminal
   insert_history.rs   # DECSTBM 历史注入 + per-batch 模式选择
@@ -12,11 +12,22 @@ src/tui/
   ledger.rs           # C/W/B 账本
   audit.rs            # committed-prefix 审计与 resync
   emit.rs             # 四条发射路径
+  wrap.rs             # span 感知的按显示宽度换行
   job_control.rs      # Ctrl-Z suspend                  [整个模块 #cfg(unix)]
   terminal_probe.rs   # CSI 6n 光标位置探测              [整个模块 #cfg(unix)]
+  theme/              # ── 视觉层（下面「视觉层」一节） ──
+    mod.rs            #   Theme / 调色板宏 / 内置主题装载
+    color.rs          #   颜色四态解析、色深降级、亮度
+    symbols.rs        #   unicode / nerd / ascii 三档符号表
+    themes/*.json     #   内置 dark / light
+  markdown.rs         # markdown → Line
+  highlight.rs        # syntect → Line
+  card.rs             # 圆角卡片 + 状态头行 + 行级原语
 tests/
-  vt_backend.rs       # VT100Backend
   shadow.rs           # shadow commit ledger
+examples/
+  inline_demo.rs      # 渲染引擎冒烟
+  theme_gallery.rs    # 视觉验收
 ```
 
 ## 模块表
@@ -43,6 +54,44 @@ tests/
 | Unix only | `job_control.rs` + `terminal_probe.rs` | ~460 |
 
 对照:oh-my-pi 的 `tui.ts` 单文件 4273 行;codex 的 `custom_terminal.rs` + `insert_history.rs` + `job_control.rs` + `terminal_probe.rs` = 3407 行。
+
+## 视觉层
+
+上面那张表是**渲染引擎**——把行送进终端、把哪些行送进历史。视觉层是另一件事：
+行长什么样。它整体对标 oh-my-pi（`packages/coding-agent/src/modes/theme/`），
+与 codex 无关（codex 的配色写死在代码里，没有可移植的主题模型）。
+
+| 模块 | 抄源 | 抄什么 |
+|---|---|---|
+| `theme/color.rs` | `modes/theme/theme.ts:1279-1358`、`packages/utils/src/color.ts:230-289` | 颜色四态（调色板索引 / 空串 / `#hex` / `vars` 键名，判定顺序严格）、递归解析带环检测、色深两档、BT.709 gamma 域亮度 |
+| `theme/symbols.rs` | `modes/theme/theme.ts:252/461/772` | `unicode` / `nerd` / `ascii` 三张**全量**静态表；档位无自动探测，由用户显式选 |
+| `theme/mod.rs` | `modes/theme/theme.ts:1137-1197,1270-1277,2095-2110` | 59 前景 + 7 背景的键集切分、`thinkingMax` 回落 `xhigh`、`statusLineBg` 亮度定亮暗 |
+| `markdown.rs` | `packages/tui/src/components/markdown.ts:2210-3020` | 标题三级形态、行内代码无反引号、围栏代码块、列表悬挂缩进、引用块、表格三段式列宽、链接同文去重 |
+| `highlight.rs` | `crates/pi-natives/src/highlight.rs:243-470` | 13 条 scope 前缀规则 → 11 个语义色；**同款 syntect**，但直接产 `Span`，省掉上游「编码成 ANSI 再解析」的往返 |
+| `card.rs` | `packages/coding-agent/src/tui/output-block.ts:64-206`、`tui/status-line.ts:29-56`、`packages/tui/src/components/box.ts:117-126` | 圆角框 + 标题嵌顶边 + 分节分隔行 + 状态底色；宽度守卫「装不下就整个丢掉边框」；状态头的换行压平与空 meta 过滤 |
+| `examples/theme_gallery.rs` | — | 本仓自加。单测能断言行宽与 `Style`，断不了「好不好看」；配色对比度、边框接缝、CJK/emoji 对齐只能靠眼睛 |
+
+### 三条与上游的硬分歧
+
+1. **不烘焙 ANSI 字符串。** 上游构造主题时就把颜色拼成 `\x1b[38;2;…m`
+   （`theme.ts:1509-1536`），代价写在它自己代码里：`getContrastFgAnsi`
+   （`theme.ts:1669-1675`）只能用正则从字符串里把 RGB 抠回来，256 色档抠不出来就
+   丢失对比度保障。本仓存 `ratatui::Color`，`Style` 由调用点组装。
+2. **`dim` 是颜色不是 `Modifier::DIM`。** 上游 `colors.dim` 就是 `#5f6673`
+   （`dark.json:11,30`）。映射成修饰符会同时丢掉颜色又叠上修饰符。
+3. **不做全局单例。** 上游 `export var theme` + 每个 getter 手写 `undefined` 守卫
+   （`theme.ts:2178`，它的 issue #2998 正是漏写一个守卫）。本仓 `&Theme` 传参，
+   「预初始化」这个状态从类型上不存在。
+
+### 明确不做
+
+| 不做 | 理由 |
+|---|---|
+| OSC 8 超链接 | `Buffer` 没有超链接属性；硬塞进 `Span` 会被当普通字符计宽，整行布局崩 |
+| Kitty OSC 66 双倍字号 H1 | 同上，且上游为它在整条渲染管线上开了一条 raw-line 旁路（`markdown.ts:1894,1943-1959`） |
+| 主题文件热加载 / `symbols.overrides` | 主题作者功能，不影响本仓自己的视觉；等真有人写第三方主题再说 |
+| shimmer 扫光动画 | 需要逐帧推进 + 每字符一个 `Span`；等 live region 有稳定的动画调度再评估 |
+| LaTeX → Unicode、mermaid | 上游 `latex-to-unicode.ts` 单文件 2000+ 行转换表，量级独立于本次范围 |
 
 ## 抄的时候必须改的地方
 

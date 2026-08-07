@@ -14,7 +14,56 @@ categories.workspace = true
 [lints]
 workspace = true
 
+# 装配层：同时接线客户端渲染栈与运行时，是 `.omp/checks/dep-boundary.check.ts`
+# 规则 2/3 的天然豁免对象（脚本注释 :31-33）。别把这里的双向依赖当泄漏。
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
+# read 工具把 `zcode_text::process_image` 产出的原始字节编成 base64 塞进 `StoredImage.data`
+# （标准字母表带 padding，见 `crates/agent/src/session/message.rs` 的字段文档）。
+base64.workspace = true
 clap.workspace = true
+crossterm.workspace = true
+futures-util.workspace = true
+ignore.workspace = true
+ratatui.workspace = true
+# bash 的 `CRITICAL_BASH_PATTERNS` 预编译成 `OnceLock<Vec<Regex>>`：`Tool::approval` 会在
+# 渲染路径上被反复调用（每帧判定锁图标），必须纯且廉价，不能每次重建正则。
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# daemon 运行时目录按工作区根分桶时算稳定哈希（`host::scoped_runtime_dir`）。
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+zcode-agent.workspace = true
+zcode-ai.workspace = true
+zcode-catalog.workspace = true
+zcode-protocol.workspace = true
+# `ToolRegistry::register` 的错误类型 `SchemaError` 归它所有，`tools::ToolInitError` 要包它。
+zcode-schema.workspace = true
+zcode-text.workspace = true
+zcode-tui.workspace = true
 zcode-utils.workspace = true
+
+# bash 工具的进程组：Unix 用 setpgid 让取消能杀到孙进程，Windows 用 Job Object。
+# 两侧都只在各自 cfg 下编译，`unsafe_code` 由 tools::bash 局部 allow 并写 SAFETY 注释。
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Console",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tempfile.workspace = true
+# TUI 断言：解析自己发出的 escape 字节并断言整屏网格（`crates/tui/tests/` 已有先例）。
+vt100.workspace = true

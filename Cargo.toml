@@ -59,6 +59,11 @@ image = { version = "0.25", default-features = false, features = [
 # 不需要 signal-hook：SIGTSTP 停住进程，SIGCONT 后从 kill 的下一行继续，无需 handler。
 libc = "0.2"
 memchr = "2.8"
+# CommonMark + GFM 解析器。选它而非 comrak：pull parser 不建 AST，渲染器可以边收
+# 事件边攒 `Line`，省掉一整棵中间树；GFM 的表格/删除线/任务列表都在。
+pulldown-cmark = { version = "0.13", default-features = false, features = [
+  "simd",
+] }
 # 只作为排版原语（Buffer/Line/Span/Widget）使用；Terminal 由 zcode-tui 自己 fork，
 # 理由见 plans/tui/modules.md。crossterm_0_29 必须显式开：default-features 关掉后
 # ratatui-crossterm 不会自己选版本，且必须与直接依赖的 crossterm 同版本。
@@ -75,6 +80,14 @@ rayon = "1.12"
 regex = "1.13"
 # bundled：不依赖系统 sqlite，跨平台构建一致（本机 MSVC C 工具链已验证可编译）。
 rusqlite = { version = "0.40", features = ["bundled"] }
+# 语法高亮。与 oh-my-pi 同源（它的 crates/pi-natives/src/highlight.rs 也是 syntect
+# 5.x）。`regex-fancy` 而非默认的 `regex-onig`：onig 要 C 工具链，纯 Rust 后端在
+# 本仓的跨平台矩阵里省掉一整类构建失败。不开 `default-themes`——配色来自本仓主题
+# 的 11 个 syntax* 键，syntect 自带的 .tmTheme 一个都用不上，白占约 1 MiB。
+syntect = { version = "5.3", default-features = false, features = [
+  "default-syntaxes",
+  "regex-fancy",
+] }
 unicode-segmentation = "1.13"
 unicode-width = "0.2"
 reqwest = { version = "0.13", default-features = false, features = [
@@ -101,14 +114,31 @@ sha2 = "0.11"
 thiserror = "2.0"
 tokio = { version = "1.53", features = [
   "fs",
+  "io-std",
   "io-util",
   "macros",
   "net",
+  "process",
   "rt",
+  "rt-multi-thread",
+  "signal",
   "sync",
   "time",
 ] }
+# 只开读路径：配置文件只读不写，`display` 会拖进 toml_writer。
+toml = { version = "1.1", default-features = false, features = [
+  "parse",
+  "serde",
+  "std",
+] }
 tracing = "0.1"
+# 日志订阅器。TUI 活动期间 stdout 归渲染，日志一律另走 sink（见 rule://zcode-architecture）。
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+  "ansi",
+  "env-filter",
+  "fmt",
+  "std",
+] }
 url = "2.5"
 webbrowser = "1.2"
 # 自己启用 ENABLE_VIRTUAL_TERMINAL_PROCESSING，不经 crossterm 的 supports_ansi()。

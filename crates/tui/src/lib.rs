@@ -8,15 +8,19 @@
 //! | 模块 | 职责 |
 //! | --- | --- |
 //! | [`caps`] | 启动时能力判定 + Windows VT 启用（判定与施加分离） |
+//! | [`card`] | 卡片（圆角边框）与工具输出块的单行标题头绘制原语（对标 oh-my-pi `output-block.ts`/`status-line.ts`） |
 //! | [`terminal`] | fork 自 `ratatui::Terminal`：viewport 是可变 [`Rect`](ratatui::layout::Rect)，且暴露裸 writer |
 //! | [`wrap`] | span 感知的按显示宽度换行，宽度全部经 `zcode-text` |
 //! | [`insert_history`] | 把已定稿行写进 scrollback：DECSTBM 注入 + per-batch 模式选择 |
 //! | [`compose`] | segment 账本：未变组件的行直接复用，只重排 stable prefix 之后 |
 //! | [`ledger`] | C/W/B 账本：哪些行已提交、窗口落在哪、哪一行起仍可变 |
+//! | [`theme`] | 颜色调色板、符号档位、色深降级（视觉取值对标 oh-my-pi） |
 //! | [`audit`] | committed-prefix 审计与 re-anchor（duplication, never loss） |
 //! | [`emit`] | 四条发射路径；`full_paint` 是全 crate 唯一的 ED3 callsite |
 //! | `job_control`（`cfg(unix)`） | Unix 的 Ctrl-Z 挂起与恢复后重锚定 |
 //! | `terminal_probe`（`cfg(unix)`） | Unix 的 `CSI 6n` 光标位置探测（`job_control` 的硬依赖） |
+//! | [`highlight`] | syntect 语法高亮：源码 → 按主题 `syntax*`/`diff*` 字段上色的 `Line` |
+//! | [`markdown`] | pulldown-cmark 事件流 → `Line`：标题/列表/引用/表格/代码块等渲染原语 |
 //!
 //! # 五条不变量
 //!
@@ -36,11 +40,15 @@
 
 pub mod audit;
 pub mod caps;
+pub mod card;
 pub mod compose;
 pub mod emit;
+pub mod highlight;
 pub mod insert_history;
 pub mod ledger;
+pub mod markdown;
 pub mod terminal;
+pub mod theme;
 pub mod wrap;
 
 #[cfg(unix)]
@@ -50,8 +58,11 @@ pub mod terminal_probe;
 
 pub use crate::audit::AuditOutcome;
 pub use crate::caps::OutputCaps;
+pub use crate::card::{render_card, render_status_line};
 pub use crate::compose::{Component, ComponentId, ComposeOutcome, Composer};
 pub use crate::emit::{EmitPath, Emitter};
 pub use crate::insert_history::{HistoryLineWrapPolicy, InsertHistoryMode};
 pub use crate::ledger::{Ledger, WindowPlan};
+pub use crate::markdown::render_markdown;
 pub use crate::terminal::{Frame, Terminal};
+pub use crate::theme::{BuiltinTheme, ColorMode, SymbolPreset, Theme};

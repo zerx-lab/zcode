@@ -63,6 +63,13 @@ pub const READY_TIMEOUT: Duration = Duration::from_mins(2);
 /// 密钥与 nonce 的字节数。32 字节 = 256 bit，与 HMAC-SHA256 的输出等宽。
 const SECRET_BYTES: usize = 32;
 
+/// 就绪端点文件名里随机 slug 的字节数。
+///
+/// 它**不是**安全参数（认证靠令牌），只需在同一个目录内不撞名：9 字节 = 72 bit，
+/// base64url 后 12 字符，加上 `ready-` 与 `.sock` 共 23 字符，给 macOS 的
+/// 104 字节 `sun_path` 上限留足了目录前缀余量。
+const ENDPOINT_SLUG_BYTES: usize = 9;
+
 /// 传给子进程的就绪端点环境变量名。
 pub const READY_ENDPOINT_ENV: &str = "ZCODE_READY_ENDPOINT";
 
@@ -467,11 +474,46 @@ pub struct ReadyChannel {
 
 impl ReadyChannel {
     /// 在 `dir` 下建一个一次性就绪端点。
+    ///
+    /// **文件名里放的不是令牌。** 两个独立理由：
+    ///
+    /// - Unix socket 的整条路径要塞进 `sockaddr_un.sun_path`，macOS 上只有 104 字节
+    ///   （Linux 108）。43 字符的 base64 令牌加上 `/var/folders/…/T/` 这种 macOS 临时目录
+    ///   前缀就会溢出，报 `InvalidInput: path must be shorter than SUN_LEN`。
+    /// - Windows named pipe 名字对**本机任意进程可见**，令牌进名字等于把唯一防线公开。
+    ///
+    /// 所以名字用一段独立的短随机 slug（只需在 `dir` 内唯一），令牌只走
+    /// [`READY_ENDPOINT_ENV`] 与握手本身。
+    ///
+    /// # 三仓对照
+    ///
+    /// **"密钥不进端点名"是三仓的一致约定**，本函数是回到该约定，不是新发明：
+    /// oh-my-pi 把令牌单独放 `broker.token`（0600 文件、0700 目录），端点名是确定性的
+    /// `broker.sock`（`packages/coding-agent/src/launch/paths.ts:7-14`、
+    /// `packages/utils/src/dirs.ts:854-858`、`client.ts:77-95`）；jcode 的端点名全是固定
+    /// 字面量 `jcode.sock` / `jcode-api.sock`（`crates/jcode-app-core/src/server/socket.rs:7-24`、
+    /// `crates/jcode-harness-api/src/sockets.rs:67-72`），生产代码里零随机成分；
+    /// opencode 压根不用 unix socket，走回环 TCP + `server.json` 注册文件
+    /// （`packages/cli/src/services/daemon.ts:164-173`），并显式 `Effect.die` 掉非 TCP 地址
+    /// （`packages/opencode/src/server/server.ts:139-146`）。
+    ///
+    /// **三仓都没有显式的 `sun_path` 长度处理**，它们靠"名字里没有变长成分"天然规避
+    /// （jcode 最长的默认端点在 macOS `$TMPDIR` 下约 65 字节，距 104 有余量）。
+    /// 唯一的平台规避是 oh-my-pi 对 DAP 适配器在 macOS 上放弃 unix socket 改回环 TCP
+    /// （`packages/coding-agent/src/dap/client.ts:217-233`），那是因为路径由第三方适配器
+    /// 接口决定、名字不可控；本函数的名字可控，所以不需要。
+    ///
+    /// **本函数保留随机 slug 而不照抄确定性短名**，因为语义相反：三仓那些端点是长驻的、
+    /// 要让任意进程自己算出来去 connect，所以必须确定性；就绪端点是一次性的、只有父子两方
+    /// 知道，且 `dir` 可能被并发的多次 spawn 共用，确定性名字会撞。9 字节 = 72 bit 的
+    /// 撞名余量远超需要，而 12 字符的名字仍留足 `sun_path` 预算。
     pub fn bind(dir: &Path) -> Result<Self, DaemonError> {
         std::fs::create_dir_all(dir)
             .map_err(|source| io_error(format!("创建目录 {}", dir.display()), source))?;
         let token = Nonce::generate()?.0;
-        let endpoint = dir.join(format!("ready-{token}.sock"));
+        let mut slug_bytes = [0_u8; ENDPOINT_SLUG_BYTES];
+        random_bytes(&mut slug_bytes)?;
+        let endpoint = dir.join(format!("ready-{}.sock", URL_SAFE_NO_PAD.encode(slug_bytes)));
         let listener = Listener::bind(&endpoint)
             .map_err(|source| io_error(format!("绑定就绪端点 {}", endpoint.display()), source))?;
         Ok(Self {
@@ -773,6 +815,28 @@ mod tests {
             assert!(reaped);
             assert!(!endpoint.exists());
         }
+    }
+
+    /// macOS 的 `sockaddr_un.sun_path` 只有 104 字节，而它的临时目录前缀
+    /// （`/var/folders/xx/…/T/`）就占掉 60 多字节。就绪端点的文件名必须留出余量，
+    /// 否则 `bind` 直接报 `path must be shorter than SUN_LEN`。
+    #[tokio::test]
+    async fn ready_endpoint_name_stays_within_the_sun_path_budget() {
+        let dir = tempfile::tempdir().expect("临时目录");
+        let channel = ReadyChannel::bind(dir.path()).expect("绑定就绪端点");
+        let name = channel
+            .endpoint
+            .file_name()
+            .expect("端点必须有文件名")
+            .to_string_lossy()
+            .into_owned();
+        assert!(
+            name.len() <= 24,
+            "端点文件名 {name} 过长（{} 字节），macOS 上会撑爆 sun_path",
+            name.len()
+        );
+        // 令牌不得出现在名字里：Windows named pipe 名对本机任意进程可见。
+        assert!(!name.contains(&channel.token), "令牌泄露进了端点名 {name}");
     }
 
     #[tokio::test]

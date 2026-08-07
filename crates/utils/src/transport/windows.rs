@@ -176,17 +176,33 @@ impl Listener {
     /// 顺序是"等到连接 → 立刻补下一个空闲实例"。补实例必然晚于 connect 返回，中间存在一个
     /// 无空闲实例的窗口；落在窗口里的客户端会收到 `ERROR_PIPE_BUSY`，由
     /// [`Stream::connect`] 的有界重试吸收。
+    ///
+    /// # 取消安全
+    ///
+    /// **本方法是取消安全的**：`self.idle` 只在 `connect()` 成功返回**之后**才被取走。
+    /// 这一点是必须的——调用方普遍会把它塞进 `tokio::time::timeout` 或 `select!`
+    /// （例如 `crate::daemon::ReadyChannel::wait` 每 50 ms 轮一次，好在等待期间
+    /// `try_wait` 子进程）。早期写法在第一次 poll、任何 `await` 之前就 `take()`，
+    /// future 一被丢弃实例就永久丢失，**下一次 accept 必然报 `BrokenPipe`**——
+    /// 症状是 `zcode run` 拉起 daemon 时立刻失败。`NamedPipeServer::connect` 本身
+    /// 由 tokio 保证取消安全，所以只要不提前 `take()`，整个方法就是取消安全的。
     pub async fn accept(&mut self) -> io::Result<Stream> {
-        let server = self.idle.take().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::BrokenPipe,
-                "listener 没有空闲 pipe 实例：上一次 accept 补实例失败",
-            )
-        })?;
-        server.connect().await?;
+        let pending = self.idle.as_mut().ok_or_else(missing_instance)?;
+        pending.connect().await?;
+        // 走到这里说明连接已建立；此时才取走它，被取消的路径不会碰到这一行。
+        let server = self.idle.take().ok_or_else(missing_instance)?;
         self.idle = Some(ServerOptions::new().create(&self.name)?);
         Ok(Stream::Server(server))
     }
+}
+
+/// `idle` 为 `None` 时的错误。理论上只在"补实例失败"之后出现——见 [`Listener::accept`]
+/// 的取消安全说明。
+fn missing_instance() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::BrokenPipe,
+        "listener 没有空闲 pipe 实例：上一次 accept 补实例失败",
+    )
 }
 
 /// 造一对已连接的流，两端都在本进程内。

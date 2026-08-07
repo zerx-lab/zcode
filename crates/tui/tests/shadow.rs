@@ -399,6 +399,81 @@ fn pinned_live_region_keeps_mutable_suffix_out_of_history() {
     }
 }
 
+/// **不丢行的硬不变量**：活跃区比整块屏幕还高时，`[B, W)` 不许消失。
+///
+/// pinned 语义把 `commit_end` 卡在 `B`（`ledger.rs:157-158`）。只要 `W > B`——活跃区
+/// 装不进屏幕时必然如此——这段行就既不会被提交进 scrollback，也不落在窗口切片里。
+/// 真机现象是消息凭空少几行，且不会自愈。
+///
+/// 引擎的取舍是 duplication, never loss：本帧降级 unpinned，把滚出去的可变行按
+/// 冻结快照提交。这个测试盯的是**每一行都还在**，不是「pinned 有没有被关掉」，
+/// 所以换别的补救手段它照样有效。
+#[test]
+fn oversized_live_region_never_drops_rows() {
+    const SCREEN_H: u16 = 10;
+    let mut emitter = new_emitter(40, SCREEN_H, interactive_caps(true));
+    emitter.set_pinned(true);
+
+    // 一个整段可变的块，行数是屏幕高度的两倍——真机上对应「工具输出的尾窗 + 状态行 +
+    // 带边框的输入框」在 24 行终端里的处境。
+    let tail: Vec<String> = (0..SCREEN_H * 2).map(|i| format!("live {i}")).collect();
+    let history = Block::new(0, &["committed history"]);
+    let live = Block::new(99, &tail.iter().map(String::as_str).collect::<Vec<_>>()).live_from(0);
+
+    let blocks = [history, live];
+    let refs: Vec<&dyn Component> = blocks.iter().map(|b| -> &dyn Component { b }).collect();
+    emitter.render(&refs, 1).expect("render 失败");
+
+    let frame = expected_frame(&blocks);
+    let committed = emitter.ledger().committed_rows();
+    let window_top = emitter.ledger().window_top();
+    assert_eq!(
+        committed, window_top,
+        "已提交行数必须与窗口顶端接上；差出来的那一段就是丢掉的行"
+    );
+    // 屏幕上能看到的 + 已经交给历史的，合起来必须覆盖整帧，一行不少。
+    assert!(
+        committed + usize::from(SCREEN_H) >= frame.len(),
+        "历史 {committed} 行 + 屏幕 {SCREEN_H} 行 < 整帧 {} 行，中间那段丢了",
+        frame.len()
+    );
+}
+
+/// 退出时活跃区必须被收起，否则它原样烙在终端上。
+///
+/// 真机现象：退出 zcode 后 shell 提示符下方挂着半个圆角输入框，而且边框的 SGR
+/// 还开着，后面每一行都染上边框色。原因是活跃区里的东西**从没提交进 scrollback**
+/// ——它是「还会变」的内容，进程一走就没人再管它了。
+///
+/// 已经提交的 transcript 不受影响：`shutdown` 只清 viewport 及其下方。
+#[test]
+fn shutdown_clears_the_live_region_but_keeps_history() {
+    const SCREEN_H: u16 = 12;
+    let mut emitter = new_emitter(20, SCREEN_H, interactive_caps(true));
+    emitter.set_pinned(true);
+
+    let history = Block::new(0, &["committed one", "committed two"]);
+    let live = Block::new(99, &["LIVEBOX", "LIVEBOX"]).live_from(0);
+    let blocks = [history, live];
+    let refs: Vec<&dyn Component> = blocks.iter().map(|b| -> &dyn Component { b }).collect();
+    emitter.render(&refs, 1).expect("render 失败");
+
+    let before = emitter.terminal().backend().rows().join("\n");
+    assert!(before.contains("LIVEBOX"), "活跃区应该先画出来：{before}");
+
+    emitter.shutdown().expect("收起活跃区失败");
+
+    let after = emitter.terminal().backend().rows().join("\n");
+    assert!(
+        !after.contains("LIVEBOX"),
+        "活跃区没被清掉，它会留在 shell 提示符旁边：{after}"
+    );
+    assert!(
+        after.contains("committed one"),
+        "已提交的 transcript 不该被一起清掉：{after}"
+    );
+}
+
 /// full paint 的三种几何：空 transcript / 未溢出屏高 / 溢出屏高。
 ///
 /// 关键断言是 viewport 顶端落点：预留空行的循环与 prefix 共用一个行计数器，

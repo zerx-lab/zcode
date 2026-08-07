@@ -6,11 +6,11 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 
 ## 现状
 
-- 阶段：**workspace 骨架已落盘**，正在逐个 crate 填实现。根 `Cargo.toml` 集中管版本/依赖/lint；
-  CI 闸门清单以 `.github/workflows/ci.yml` 为准。
+- 阶段：**九个 crate 与装配层均已落盘**，`zcode` 端到端可跑一次对话。根 `Cargo.toml` 集中管
+  版本/依赖/lint；CI 闸门清单以 `.github/workflows/ci.yml` 为准。
 - **本文件不记录瞬时状态**：门禁是否全绿、哪个 crate 写到什么程度、有哪些文件 —— 一律不写。
   那些跑一次 `/gate`、看一眼目录列表与 `git status` 就知道，写进来只会变成过时的错误记忆。
-- 下一步：按 `rule://zcode-architecture` 的职责表逐个填实现；`crates/tui/` 的设计事实源是 `plans/tui/`。
+- `crates/tui/` 的设计事实源是 `plans/tui/`；进程边界的事实源是 `plans/runtime-boundary/`。
 
 ## 命令
 
@@ -51,6 +51,8 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 计划中的 crate 布局归 `rule://zcode-architecture`，不要提前搬进这里。
 
 - `crates/` — 十个 workspace 成员；职责表、导入边界、worker 契约、**进程边界**见 `rule://zcode-architecture`。CLI 入口是 `crates/coding-agent`（包名 `zcode`），同时是所有 worker 的 host 二进制
+- `crates/coding-agent/src/` — 装配层，唯一同时接线渲染栈与运行时的 crate（`dep-boundary` 规则 2/3 的豁免对象）。`cli`（命令面 + **会话选择**）/ `config`（两层 TOML）/ `workspace`（唯一路径解析入口，越界不报错只标记）/ `prompt`（静态 `.md`；环境上下文走首条消息不进 system）/ `model`（本地目录，不联网）/ `tools`（八个内置工具 + 唯一输出收尾 `tools::output`）/ `host`（session actor + wire 互转 + daemon 编排）/ `render`（headless）/ `app`（TUI）/ `smoke`（端到端冒烟）
+- `crates/coding-agent/src/host/connect.rs` — **执行路径只有一条**：daemon 在就连它，不在就 `stream_pair()` 自托管接同一个 `handle_client`。绝不为 headless 另开"直接建 `AgentRuntime`"的近路 —— `plans/runtime-boundary/README.md` 第 8 节与第 9 节已裁决
 - `crates/protocol/` — 客户端 ↔ 运行时的唯一编译边界：wire 类型全归它，依赖方向 `tui -> protocol <- runtime`，两侧不得绕过它互相直连
 - `crates/utils/src/transport/` — 跨平台本机 IPC：Unix socket 与 Windows named pipe 包装成同名类型，上层零 `cfg`。`stream_pair()` 让 headless 与 TUI 共用同一个连接处理函数。不在此层做探活：Windows 上先探一次会占掉唯一 pipe 实例，随后的 connect 会卡在 `ERROR_PIPE_BUSY`
 - `crates/utils/src/env.rs` — worker 子进程重入 CLI 的路径解析：`declare_worker_host_entry` / `worker_host_entry`
@@ -68,6 +70,7 @@ Rust 实现的 agent harness。**本文件是记忆索引，不是文档**：只
 - `crates/tui/src/emit.rs` — 四条发射路径的调度器，也是全 crate 唯一发 ED3（`CSI 3J`）的地方；改渲染路径前先读 `crates/tui/src/lib.rs` 顶部的五条不变量
 - `crates/tui/src/terminal.rs` — fork 自 codex 的 `Terminal`，但 `draw` 只发相对光标移动（上游发绝对 `MoveTo`）：绝对定位会把已向上滚动的读者拽回底部
 - `crates/tui/src/wrap.rs` — `line_rows` 与 `wrap_line` 必须共用同一套贪心切分；行数被 `insert_history` 用来推进 viewport 锚点，算术公式会少记行
+- `crates/tui/src/theme/` — 配色与符号的唯一来源（66 键调色板、`unicode`/`nerd`/`ascii` 三档符号、色深降级），取值全量对标 oh-my-pi；`crates/tui/src/markdown.rs`、`crates/tui/src/highlight.rs`、`crates/tui/src/card.rs` 都从它取样式。**渲染代码里不得出现颜色字面量**，改样式改这里；肉眼验收跑 `cargo run -p zcode-tui --example theme_gallery`
 - `crates/schema/src/compile.rs` — JSON Schema 校验是 fail-closed：schema 形状非法或 `pattern` 编译不了都在 `compile` 期报错，绝不降级成跳过约束
 - `.github/workflows/ci.yml` — 闸门编排：fmt、三平台 clippy/test、cross-check（目标清单以该 workflow 为准）、MSRV（从 `rust-version` 读）、docs、deny、machete、index-guard、dep-boundary
 - `.github/dependabot.yml` — cargo 与 actions 每周更新，次版本/补丁合并成一个 PR

@@ -363,11 +363,7 @@ fn safe_cutoff(records: &[MessageRecord], initial_cutoff: usize) -> Option<usize
 /// 制定压缩计划。
 ///
 /// `occupied` 是 [`effective_context_tokens`] 算出的占用值。未达
-/// [`ContextBudget::threshold`] 不压缩；达到后，初始切点取"倒数第
-/// [`RECENT_TURNS_TO_KEEP`] 条消息"，再交给 `safe_cutoff` 调整到不撕裂工具配对的
-/// 位置。调整后的切点等于 0（意味着连一条消息都摘要不了）或者根本找不到安全切点，
-/// 都视为"这次不压"——宁可让上下文继续增长，也不生成一份会让下一次请求 400 的
-/// 保留段（jcode `safe_compaction_cutoff` 同策：找不到就返回等价于不切的值）。
+/// [`ContextBudget::threshold`] 不压缩；达到后交给 [`plan_from_cutoff`] 找安全切点。
 #[must_use]
 pub fn plan_compaction(
     records: &[MessageRecord],
@@ -377,8 +373,30 @@ pub fn plan_compaction(
     if occupied < budget.threshold() {
         return CompactionPlan::None;
     }
-    let urgent = occupied >= budget.critical();
+    plan_from_cutoff(records, occupied >= budget.critical())
+}
 
+/// 不看阈值，直接按安全切点制定计划。
+///
+/// 用户**显式**请求压缩（[`CompactionReason::Manual`](crate::session::entry::CompactionReason::Manual)）
+/// 走这条。阈值门是给自动触发用的：把它加在手动路径上，会让"立刻压缩"在占用不高时
+/// 静默变成 no-op——命令看起来成功了，实际什么都没发生，而这种失败编译器和类型系统
+/// 都拦不住。历史仍然不够（保留段之外一条消息都没有）时照样返回
+/// [`CompactionPlan::None`]，那是真的没东西可压，不是被门挡住。
+///
+/// `urgent` 恒为 `false`：紧急标志表达的是"占用已经逼近硬上限"，手动压缩与占用无关。
+#[must_use]
+pub fn plan_forced_compaction(records: &[MessageRecord]) -> CompactionPlan {
+    plan_from_cutoff(records, false)
+}
+
+/// 找安全切点：初始切点取"倒数 [`RECENT_TURNS_TO_KEEP`] 条消息"，再交给
+/// [`safe_cutoff`] 调整到不撕裂工具配对的位置。
+///
+/// 调整后的切点等于 0（连一条消息都摘要不了）或者根本找不到安全切点，都视为"这次不压"——
+/// 宁可让上下文继续增长，也不生成一份会让下一次请求 400 的保留段
+/// （jcode `safe_compaction_cutoff` 同策：找不到就返回等价于不切的值）。
+fn plan_from_cutoff(records: &[MessageRecord], urgent: bool) -> CompactionPlan {
     let initial_cutoff = records.len().saturating_sub(RECENT_TURNS_TO_KEEP);
     if initial_cutoff == 0 {
         return CompactionPlan::None;
@@ -553,6 +571,45 @@ mod tests {
         let budget = ContextBudget { window: 1000 };
         let records = vec![record(StoredMessage::user("hi"))];
         assert_eq!(plan_compaction(&records, budget, 500), CompactionPlan::None);
+    }
+
+    /// 手动压缩**必须**绕过阈值门。
+    ///
+    /// 这是一个真实回归：`plan_compaction` 的阈值门一旦被手动路径复用，
+    /// `Request::Compact` 在占用不高时就静默变成 no-op——命令回 `Ok`，
+    /// 会话里什么都没发生。编译器与类型系统都拦不住这种"假装完成"。
+    #[test]
+    fn forced_compaction_ignores_the_threshold_gate() {
+        let budget = ContextBudget { window: 1_000_000 };
+        // 12 条消息：超出 RECENT_TURNS_TO_KEEP(10)，因此存在可摘要的前缀。
+        let records: Vec<MessageRecord> = (0..12)
+            .map(|i| record(StoredMessage::user(format!("q{i}"))))
+            .collect();
+
+        assert_eq!(
+            plan_compaction(&records, budget, 1),
+            CompactionPlan::None,
+            "占用远低于阈值时自动压缩不该触发"
+        );
+        let CompactionPlan::Compact { first_kept, urgent } = plan_forced_compaction(&records)
+        else {
+            panic!("同一份历史手动压缩必须给出计划，否则 Request::Compact 是空操作");
+        };
+        assert_eq!(
+            first_kept.as_ref(),
+            records.get(2).map(|r| &r.id),
+            "保留段应当从倒数第 RECENT_TURNS_TO_KEEP 条开始"
+        );
+        assert!(!urgent, "手动压缩与占用无关，不该标紧急");
+    }
+
+    /// 绕过阈值不等于绕过安全切点：历史确实不够时仍然不压。
+    #[test]
+    fn forced_compaction_still_needs_something_to_summarize() {
+        let records: Vec<MessageRecord> = (0..3)
+            .map(|i| record(StoredMessage::user(format!("q{i}"))))
+            .collect();
+        assert_eq!(plan_forced_compaction(&records), CompactionPlan::None);
     }
 
     #[test]

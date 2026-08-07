@@ -17,6 +17,13 @@ workspace = true
 [dependencies]
 crossterm.workspace = true
 ratatui.workspace = true
+pulldown-cmark.workspace = true
+# 主题文件（内置 dark/light 与将来的用户主题）走 JSON：颜色键集固定，serde struct
+# 缺键即报错，等价于上游用 arktype schema 做的全量校验。
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+syntect.workspace = true
 tracing.workspace = true
 # 显示宽度 / 截断 / 换行的唯一实现落点，见 rule://zcode-architecture「TUI 输出清理」。
 zcode-text.workspace = true

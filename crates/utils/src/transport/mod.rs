@@ -77,6 +77,32 @@ mod tests {
         round_trip(server, client).await
     }
 
+    /// `accept()` 被取消后，listener 必须仍然可用。
+    ///
+    /// 这是一条真机抓到的回归：Windows 侧早期实现在第一次 poll、任何 `await` 之前就
+    /// `self.idle.take()`，被 `tokio::time::timeout` 打断后实例永久丢失，下一次 accept
+    /// 直接 `BrokenPipe`。而 [`crate::daemon::ReadyChannel::wait`] 正是每 50 ms 轮一次
+    /// （好在等待期间 `try_wait` 子进程），于是"拉起 daemon"这条路径**必然**失败。
+    /// Unix 侧 `UnixListener::accept` 本就取消安全，本测试对两个平台都成立。
+    #[tokio::test]
+    async fn accept_stays_usable_after_being_cancelled() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("zcode-transport-cancel.sock");
+        let mut listener = Listener::bind(&path)?;
+
+        // 没有客户端，这次 accept 必定超时并被丢弃。
+        let cancelled =
+            tokio::time::timeout(std::time::Duration::from_millis(30), listener.accept()).await;
+        assert!(cancelled.is_err(), "无人连接时这次 accept 应当超时");
+
+        // 被取消之后照样能接下一个连接。
+        let accept = tokio::spawn(async move { listener.accept().await });
+        let client = Stream::connect(&path).await?;
+        let server = accept.await.map_err(io::Error::other)??;
+
+        round_trip(server, client).await
+    }
+
     #[tokio::test]
     async fn second_bind_to_live_endpoint_fails() -> io::Result<()> {
         let dir = tempfile::tempdir()?;

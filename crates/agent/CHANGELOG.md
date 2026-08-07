@@ -52,6 +52,13 @@
   形状对齐 `ApprovalGate`。待回答状态挂在 session 上，断连不作废、重连可用 `pending()` 补拉；
   jcode 把 oneshot 存在每连接的 map 里，连接一断工具侧立刻收 `Err` 而子进程还卡在读 stdin。
 - `AgentEvent::StdinRequested` / `StdinResolved`。
+- `AgentRuntime` 的宿主侧访问器：`store_mut()` / `config_mut()` / `compact()`。
+  wire 协议里的 `SetHead` / `SetModel` / `SetTitle` / `SetApprovalMode` / `Compact`
+  都发生在 turn 之外，此前宿主拿不到任何 `&mut` 入口，这五个请求无法实现。
+  `store_mut()` 的文档写明它**不得**用来绕开 turn 循环追加消息——turn 循环维护着
+  "每个 `ToolCall` 都有配对 `ToolResult`"这条提供商硬约束。
+- `context::plan_forced_compaction`：不看阈值、只找安全切点的压缩计划，
+  供 `CompactionReason::Manual` 使用。
 
 
 ### Fixed
@@ -62,6 +69,13 @@
   取消并等最初只写在主流程上、压缩那条流漏改，同构漏洞出现过两次。
   四个可挂起点各有一条 `tokio::time::timeout` 回归测试，且都用"临时退回旧写法必失败"
   验证过它们不是空转。
+- 手动压缩不再静默 no-op。`AgentRuntime::compact()` 原先复用带阈值门的
+  `plan_compaction`，占用低于 `budget.threshold()` 时直接返回 `CompactionPlan::None`——
+  `Request::Compact` 于是回一个成功却什么都没做，既无 `Compaction` 条目也无
+  `Compacted` 事件，调用方无从分辨。现在 `Manual` 走 `plan_forced_compaction`，
+  只在**真的没有可摘要前缀**时才是 no-op。四条测试钉住：阈值门被绕过、
+  历史不够时仍不压、落盘条目的 `reason` 为 `Manual`、广播的 `Compacted.entry`
+  与落盘条目 id 一致。
 - rustdoc 在 `-D warnings` 下报的文档链接问题：`context.rs` / `id.rs` / `tool/registry.rs` /
   `turn.rs` 中指向私有项（`COMPACTION_THRESHOLD_PERCENT`、`DEFAULT_CONTEXT_WINDOW`、
   `safe_cutoff`、`next_stamp`、`MAX_SUGGESTIONS`、`StreamAccumulator`）的 intra-doc

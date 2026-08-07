@@ -16,7 +16,20 @@ all-features = true
 [advisories]
 yanked = "deny"
 # 有必须临时豁免的公告时，在此写 RUSTSEC 编号并附上到期理由。
-ignore = []
+ignore = [
+  # bincode 1.3.3 停止维护（不是漏洞公告）。链路：syntect 5.3 → bincode 1.3.3，
+  # 它只用来反序列化 syntect 内置的语法定义 dump——输入是编译进二进制的静态字节，
+  # 不接触任何外部数据，攻击面为零。
+  #
+  # 上游作者的结论是「1.3.3 是完整版本，不需要再更新」，所以没有可升级的目标；
+  # 公告列出的替代品（postcard / rkyv 等）都要 syntect 自己换格式，不是本仓能选的。
+  # 唯一的规避方式是关掉 syntect 的 `default-syntaxes`（dump 是 bincode 格式），
+  # 改成启动时解析 YAML 语法定义——那会把首次高亮的延迟从微秒级推到数百毫秒，
+  # 直接吃掉整个帧预算。取舍见 `crates/tui/src/highlight.rs` 的模块文档。
+  #
+  # 复查条件：syntect 换掉 bincode，或本仓换掉 syntect。
+  { id = "RUSTSEC-2025-0141", reason = "syntect 的静态语法 dump 解析，无外部输入" },
+]
 
 [licenses]
 allow = [

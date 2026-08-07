@@ -33,7 +33,7 @@ use crate::approval::{
 use crate::cancel::{CancelRegistry, TurnRegistration};
 use crate::context::{
     CompactionPlan, ContextBudget, effective_context_tokens, estimate_context, plan_compaction,
-    reported_context_tokens,
+    plan_forced_compaction, reported_context_tokens,
 };
 use crate::error::AgentError;
 use crate::event::{AgentEvent, EventSink};
@@ -465,6 +465,34 @@ impl AgentRuntime {
         result
     }
 
+    /// 可变借出会话存储。
+    ///
+    /// 宿主层要在 turn 之外改会话：`/rewind` 与 `/branch` 改 head、切模型与改标题各追加
+    /// 一条条目。这些都不经过 turn 循环，因此只读的 [`AgentRuntime::store`] 不够。
+    ///
+    /// **不要用它绕开 turn 循环追加消息**：turn 循环维护着"每个 `ToolCall` 都有配对
+    /// `ToolResult`"这条提供商硬约束（见 [`crate::session::message`] 的不变量一节），
+    /// 从外部插入消息会破坏它，后续每一次请求都 400。
+    pub fn store_mut(&mut self) -> &mut SessionStore {
+        &mut self.store
+    }
+
+    /// 可变借出 turn 配置。
+    ///
+    /// 会话生命周期内可以切换审批模式、思考档位与逐工具策略。改动对**下一次**
+    /// [`AgentRuntime::run_turn`] 生效；正在跑的 turn 已经把配置读进栈上了，不受影响。
+    pub fn config_mut(&mut self) -> &mut TurnConfig {
+        &mut self.config
+    }
+
+    /// 立刻压缩一次上下文，不管是否达到阈值。
+    ///
+    /// 对应用户显式请求（wire 侧的 `Request::Compact`）。找不到安全切点时是 no-op——
+    /// 宁可不压也不能切出孤儿 `tool_use`，理由见 [`AgentRuntime::compact_with`] 的实现注释。
+    pub async fn compact(&mut self) -> Result<(), AgentError> {
+        self.compact_with(CompactionReason::Manual).await
+    }
+
     /// turn 主循环。
     async fn drive(&mut self) -> Result<(), AgentError> {
         let mut context_retries = 0_u32;
@@ -492,7 +520,7 @@ impl AgentRuntime {
                             attempts: context_retries,
                         });
                     }
-                    self.compact(CompactionReason::Overflow).await?;
+                    self.compact_with(CompactionReason::Overflow).await?;
                     continue;
                 }
             }) else {
@@ -776,32 +804,47 @@ impl AgentRuntime {
     }
 
     /// 当前上下文的占用估算与压缩计划。
-    fn current_plan(&self) -> (CompactionPlan, Vec<crate::session::message::MessageRecord>) {
+    ///
+    /// `reason` 决定走哪条计划：自动触发（`Threshold` / `Overflow`）要过阈值门，
+    /// 用户显式请求（`Manual`）不过——阈值门加在手动路径上会让"立刻压缩"在占用不高时
+    /// 静默 no-op，见 [`plan_forced_compaction`] 的文档。
+    fn plan_for(
+        &self,
+        reason: CompactionReason,
+    ) -> (CompactionPlan, Vec<crate::session::message::MessageRecord>) {
         let records = self.store.tree().context();
-        let messages: Vec<StoredMessage> = records
-            .iter()
-            .map(|record| record.message.clone())
-            .collect();
-        let budget = ContextBudget::for_model(self.store.tree().model());
-        let occupied = effective_context_tokens(estimate_context(&messages), self.last_reported);
-        (plan_compaction(&records, budget, occupied), records)
+        let plan = match reason {
+            CompactionReason::Manual => plan_forced_compaction(&records),
+            CompactionReason::Threshold | CompactionReason::Overflow => {
+                let messages: Vec<StoredMessage> = records
+                    .iter()
+                    .map(|record| record.message.clone())
+                    .collect();
+                let budget = ContextBudget::for_model(self.store.tree().model());
+                let occupied =
+                    effective_context_tokens(estimate_context(&messages), self.last_reported);
+                plan_compaction(&records, budget, occupied)
+            }
+        };
+        (plan, records)
     }
 
     /// 需要时压缩上下文。
     async fn compact_if_needed(&mut self) -> Result<(), AgentError> {
-        let (plan, _) = self.current_plan();
+        let (plan, _) = self.plan_for(CompactionReason::Threshold);
         if matches!(plan, CompactionPlan::None) {
             return Ok(());
         }
-        self.compact(CompactionReason::Threshold).await
+        self.compact_with(CompactionReason::Threshold).await
     }
 
     /// 执行一次压缩：请模型给出摘要，写入一条 [`EntryKind::Compaction`]。
-    async fn compact(&mut self, reason: CompactionReason) -> Result<(), AgentError> {
-        let (plan, records) = self.current_plan();
+    async fn compact_with(&mut self, reason: CompactionReason) -> Result<(), AgentError> {
+        let (plan, records) = self.plan_for(reason);
         let CompactionPlan::Compact { first_kept, .. } = plan else {
             // 找不到安全切点：宁可不压也不能切出孤儿 `tool_use`——那会让后续每次请求都 400。
-            tracing::warn!("上下文已超阈值但找不到安全的压缩切点，保持原样");
+            // 手动路径走到这里说明历史确实还不够压（保留段之外一条消息都没有）。
+            tracing::warn!(?reason, "找不到安全的压缩切点，保持原样");
             return Ok(());
         };
 
@@ -1182,5 +1225,109 @@ mod tests {
     #[test]
     fn non_assistant_messages_have_no_tool_calls() {
         assert!(collect_tool_calls(&StoredMessage::user("hi")).is_empty());
+    }
+
+    /// 只产出一段固定摘要的假 provider。
+    ///
+    /// trait 注入而不是全局替换：`rule://rust-testing` 禁止进程级 mock，
+    /// 而且并行跑测时全局替换必然互相串。
+    #[derive(Debug)]
+    struct SummaryProvider;
+
+    #[async_trait::async_trait]
+    impl Provider for SummaryProvider {
+        fn id(&self) -> zcode_ai::ProviderId {
+            zcode_ai::ProviderId::Anthropic
+        }
+
+        async fn stream(
+            &self,
+            _request: &CompletionRequest,
+        ) -> Result<EventStream, zcode_ai::AiError> {
+            let events = vec![
+                Ok(StreamEvent::TextStart { index: 0 }),
+                Ok(StreamEvent::TextDelta {
+                    index: 0,
+                    delta: "前情摘要".to_owned(),
+                }),
+                Ok(StreamEvent::TextEnd {
+                    index: 0,
+                    text: "前情摘要".to_owned(),
+                }),
+                Ok(done()),
+            ];
+            Ok(Box::pin(futures_util::stream::iter(events)))
+        }
+    }
+
+    async fn runtime_with_history(dir: &std::path::Path, messages: usize) -> AgentRuntime {
+        let mut store = SessionStore::create(dir, "/tmp/ws".to_owned(), "test-model".to_owned())
+            .await
+            .expect("建会话");
+        for i in 0..messages {
+            store
+                .append(EntryKind::Message {
+                    message: StoredMessage::user(format!("q{i}")),
+                })
+                .await
+                .expect("写入消息");
+        }
+        AgentRuntime::new(
+            Arc::new(SummaryProvider),
+            Arc::new(ToolRegistry::new()),
+            store,
+            Arc::new(CancelRegistry::new()),
+            TurnConfig::default(),
+        )
+    }
+
+    /// 用户显式压缩必须**真的**压，哪怕占用远低于阈值。
+    ///
+    /// 回归防线：`compact()` 若复用带阈值门的 `plan_compaction`，`Request::Compact`
+    /// 就会回一个成功却什么都没做——会话里既没有 `Compaction` 条目，也没有
+    /// `Compacted` 事件，而调用方无从分辨。
+    #[tokio::test]
+    async fn manual_compaction_writes_an_entry_below_threshold() {
+        let dir = tempfile::tempdir().expect("临时目录");
+        // 12 条 > RECENT_TURNS_TO_KEEP(10)，因此存在可摘要的前缀；
+        // 12 条短消息的 token 估算远低于任何模型的压缩阈值。
+        let mut runtime = runtime_with_history(dir.path(), 12).await;
+        let mut events = runtime.events().subscribe();
+
+        runtime.compact().await.expect("手动压缩不该失败");
+
+        let branch = runtime.store().tree().branch();
+        let last = branch.last().expect("路径非空");
+        let EntryKind::Compaction {
+            summary, reason, ..
+        } = &last.kind
+        else {
+            panic!("手动压缩必须落一条 Compaction 条目，实得：{:?}", last.kind);
+        };
+        assert_eq!(summary, "前情摘要");
+        assert_eq!(*reason, CompactionReason::Manual);
+
+        let event = events.recv().await.expect("必须广播 Compacted");
+        assert!(
+            matches!(event, AgentEvent::Compacted { ref entry } if entry == &last.id),
+            "Compacted 的条目 id 要与落盘的那条一致：{event:?}"
+        );
+    }
+
+    /// 绕过阈值不等于绕过安全切点：历史确实不够时保持原样，且**不**伪造事件。
+    #[tokio::test]
+    async fn manual_compaction_is_a_noop_when_there_is_nothing_to_summarize() {
+        let dir = tempfile::tempdir().expect("临时目录");
+        let mut runtime = runtime_with_history(dir.path(), 3).await;
+
+        runtime.compact().await.expect("没东西可压不算失败");
+
+        let branch = runtime.store().tree().branch();
+        assert!(
+            !branch
+                .iter()
+                .any(|entry| matches!(entry.kind, EntryKind::Compaction { .. })),
+            "历史不够时不该落 Compaction 条目"
+        );
     }
 }
