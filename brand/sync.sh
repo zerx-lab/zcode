@@ -18,14 +18,14 @@ git diff --unified=0 refs/brand/last-sync..upstream/main -- '*.ts' '*.rs' |
 	echo "(无)"
 
 # 2) 唯一冲突点：补丁栈重放（rerere 自动重放已知解法）
-git checkout fork
+git checkout zcode
 git rebase upstream/main || {
 	echo "补丁栈冲突：解决后 git rebase --continue，再重跑本脚本" >&2
 	exit 1
 }
 
 # 3) release 为派生物：丢弃重建，overlay 永不参与三方合并
-git branch -f release fork
+git branch -f release zcode
 git checkout release
 if [[ -f brand/apply.ts ]]; then
 	bun brand/apply.ts
@@ -45,4 +45,4 @@ bun check
 
 # 5) 推进漂移基线
 git update-ref refs/brand/last-sync upstream/main
-echo "=== 同步完成: fork @ $(git rev-parse --short fork), baseline @ $(git rev-parse --short refs/brand/last-sync) ==="
+echo "=== 同步完成: zcode @ $(git rev-parse --short zcode), baseline @ $(git rev-parse --short refs/brand/last-sync) ==="
