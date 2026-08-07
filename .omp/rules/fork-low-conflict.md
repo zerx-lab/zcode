@@ -29,4 +29,5 @@ alwaysApply: true
 | slash 命令 / 规则 / 技能 / 自定义工具 | `.omp/{commands,rules,skills,tools}/` 新文件，零代码接线 |
 | 扩展逻辑（hooks） | `.omp/extensions/` 或 `~/.zcode/agent/extensions/`，loader 自动发现 |
 | 品牌常量 | `packages/utils/src/brand.ts` 加导出 |
+| 终端字标 / logo | `modes/components/brand-logo.ts` 改 `ZCODE_LOGO`（约束见 `docs/fork/sync-strategy.md`「品牌字标」）；SVG 源在 `brand/logo/` |
 | 同步/构建脚本 | `brand/` 或 `scripts/` 新文件（不进根 package.json scripts） |
