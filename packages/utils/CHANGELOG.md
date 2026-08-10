@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+### Added
+- Exported `BRAND_MARK` and single-source `BRAND_RAMP` / RGB / 256-color brand palette helpers
 ## [17.2.11] - 2026-08-07
 
 ### Added

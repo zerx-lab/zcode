@@ -9,7 +9,7 @@ import {
 } from "@oh-my-pi/pi-tui";
 import { APP_NAME } from "@oh-my-pi/pi-utils";
 import { theme } from "../../modes/theme/theme";
-import { ZCODE_LOGO } from "./brand-logo";
+import { BRAND_GRADIENT_RAMP_256, BRAND_GRADIENT_STOPS, ZCODE_LOGO } from "./brand-logo";
 import tipsText from "./tips.txt" with { type: "text" };
 
 /** Tips embedded at build time, one per line; blanks dropped. */
@@ -454,16 +454,10 @@ export class WelcomeComponent implements Component {
 export const PI_LOGO = ZCODE_LOGO;
 
 /** Multi-stop palette for the diagonal gradient. */
-const GRADIENT_STOPS: ReadonlyArray<readonly [number, number, number]> = [
-	[255, 92, 200], // hot pink
-	[200, 110, 255], // violet
-	[120, 130, 255], // periwinkle
-	[60, 200, 255], // bright cyan
-	[120, 255, 220], // mint
-];
+const GRADIENT_STOPS = BRAND_GRADIENT_STOPS;
 
 /** 256-color ramp fallback when truecolor isn't available. */
-const GRADIENT_RAMP_256 = [199, 171, 135, 99, 75, 51, 87];
+const GRADIENT_RAMP_256 = BRAND_GRADIENT_RAMP_256;
 
 /** Half-width of the shine highlight band, expressed in gradient-t units. */
 const SHINE_HALF_WIDTH = 0.18;

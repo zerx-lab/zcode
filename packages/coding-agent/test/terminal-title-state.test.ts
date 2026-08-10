@@ -7,52 +7,53 @@ import {
 } from "@oh-my-pi/pi-coding-agent/utils/title-generator";
 import { isConPTYHosted } from "@oh-my-pi/pi-tui";
 import { setTerminalHeadless } from "@oh-my-pi/pi-utils";
+import { BRAND_MARK } from "@oh-my-pi/pi-utils/brand";
 import { mockWindowsConsoleTitle, type WindowsConsoleTitleMock } from "./terminal-title-test-utils";
 
 const LABEL = "my-project";
 
 describe("buildTerminalTitleWithState", () => {
 	it("separates brand and label with '>' when idle/done (your turn)", () => {
-		expect(buildTerminalTitleWithState(LABEL, "idle", 0, true)).toBe(`π > ${LABEL}`);
+		expect(buildTerminalTitleWithState(LABEL, "idle", 0, true)).toBe(`${BRAND_MARK} > ${LABEL}`);
 	});
 
 	it("separates brand and label with '!' when the agent needs attention", () => {
-		expect(buildTerminalTitleWithState(LABEL, "attention", 0, true)).toBe(`π ! ${LABEL}`);
+		expect(buildTerminalTitleWithState(LABEL, "attention", 0, true)).toBe(`${BRAND_MARK} ! ${LABEL}`);
 	});
 
 	it("animates spinner frames in the separator slot while working outside Windows", () => {
 		const frame0 = buildTerminalTitleWithState(LABEL, "working", 0, true, "linux");
 		const frame1 = buildTerminalTitleWithState(LABEL, "working", 1, true, "linux");
-		// The brand stays a bare `π`; only the separator between brand and label
+		// The brand stays a bare mark; only the separator between brand and label
 		// carries the spinner glyph, and it advances per frame.
-		expect(frame0).toBe(`π ⠋ ${LABEL}`);
-		expect(frame1).toBe(`π ⠙ ${LABEL}`);
+		expect(frame0).toBe(`${BRAND_MARK} ⠋ ${LABEL}`);
+		expect(frame1).toBe(`${BRAND_MARK} ⠙ ${LABEL}`);
 		expect(frame1).not.toBe(frame0);
 		// The frame index is taken modulo the frame count, so it never throws or
 		// produces an "undefined" separator for a large counter.
 		const wrapped = buildTerminalTitleWithState(LABEL, "working", 9999, true, "linux");
-		expect(wrapped.startsWith("π ")).toBe(true);
+		expect(wrapped.startsWith(`${BRAND_MARK} `)).toBe(true);
 		expect(wrapped.endsWith(` ${LABEL}`)).toBe(true);
 		expect(wrapped).not.toContain("undefined");
 	});
 
 	it("uses a static colon while working on Windows", () => {
-		expect(buildTerminalTitleWithState(LABEL, "working", 0, true, "win32")).toBe(`π : ${LABEL}`);
-		expect(buildTerminalTitleWithState(LABEL, "working", 1, true, "win32")).toBe(`π : ${LABEL}`);
-		expect(buildTerminalTitleWithState(undefined, "working", 1, true, "win32")).toBe("π :");
+		expect(buildTerminalTitleWithState(LABEL, "working", 0, true, "win32")).toBe(`${BRAND_MARK} : ${LABEL}`);
+		expect(buildTerminalTitleWithState(LABEL, "working", 1, true, "win32")).toBe(`${BRAND_MARK} : ${LABEL}`);
+		expect(buildTerminalTitleWithState(undefined, "working", 1, true, "win32")).toBe(`${BRAND_MARK} :`);
 	});
 
 	it("keeps the state visible as a trailing separator when there is no label", () => {
-		expect(buildTerminalTitleWithState(undefined, "idle", 0, true)).toBe("π >");
-		expect(buildTerminalTitleWithState(undefined, "attention", 0, true)).toBe("π !");
-		expect(buildTerminalTitleWithState(undefined, "working", 0, true, "linux")).toBe("π ⠋");
+		expect(buildTerminalTitleWithState(undefined, "idle", 0, true)).toBe(`${BRAND_MARK} >`);
+		expect(buildTerminalTitleWithState(undefined, "attention", 0, true)).toBe(`${BRAND_MARK} !`);
+		expect(buildTerminalTitleWithState(undefined, "working", 0, true, "linux")).toBe(`${BRAND_MARK} ⠋`);
 	});
 
-	it("renders the pre-state `π: label` layout when disabled, regardless of state", () => {
-		expect(buildTerminalTitleWithState(LABEL, "working", 3, false)).toBe(`π: ${LABEL}`);
-		expect(buildTerminalTitleWithState(LABEL, "idle", 0, false)).toBe(`π: ${LABEL}`);
-		expect(buildTerminalTitleWithState(LABEL, "attention", 0, false)).toBe(`π: ${LABEL}`);
-		expect(buildTerminalTitleWithState(undefined, "idle", 0, false)).toBe("π");
+	it("renders the pre-state `<mark>: label` layout when disabled, regardless of state", () => {
+		expect(buildTerminalTitleWithState(LABEL, "working", 3, false)).toBe(`${BRAND_MARK}: ${LABEL}`);
+		expect(buildTerminalTitleWithState(LABEL, "idle", 0, false)).toBe(`${BRAND_MARK}: ${LABEL}`);
+		expect(buildTerminalTitleWithState(LABEL, "attention", 0, false)).toBe(`${BRAND_MARK}: ${LABEL}`);
+		expect(buildTerminalTitleWithState(undefined, "idle", 0, false)).toBe(BRAND_MARK);
 	});
 });
 

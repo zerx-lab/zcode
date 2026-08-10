@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+### Changed
+- Switched status-bar and terminal-title mark from π to zcode `Z`, and drove splash/logo gradients from the shared brand ramp
 ## [17.2.12] - 2026-08-08
 
 ### Fixed
