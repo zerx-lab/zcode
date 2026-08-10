@@ -90,6 +90,8 @@
     "collab:relay": "bun --cwd=packages/collab-web run relay",
     "collab:mock-host": "bun --cwd=packages/collab-web run mock-host",
     "collab:web:build": "bun --cwd=packages/collab-web run build",
+    "collab:server:build": "bun --cwd=packages/collab-server run build:linux",
+    "collab:server:start": "bun --cwd=packages/collab-server run start",
     "meta": "bun --cwd=packages/metaharness run dev",
     "claude:trace": "bun scripts/claude-trace.ts",
     "build": "bun run --workspaces --if-present build",
