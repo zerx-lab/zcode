@@ -39,6 +39,47 @@ const BRAND_BLOCK_HTML = `<div class="brand">
 			</div>`;
 
 /**
+ * 修上游的死按钮：`window.close()` 只能关掉**脚本自己 `window.open` 的**窗口。
+ * OAuth 回调 tab 是授权站点 302 过来的顶层导航，浏览器一律拒绝关闭请求——上游那个
+ * `onclick="window.close()"` 和 3 秒自动关闭因此都是无声失效的（既不抛异常也不
+ * 提示，用户只看到点了没反应）。
+ *
+ * 关不掉是浏览器的硬约束，改不了；能修的是「无声」：先照常尝试关闭（tab 真的是
+ * 脚本打开的场景仍然会关掉），200ms 后页面还活着就说明被拒，把文案与按钮切成
+ * 明确的手动关闭指引。
+ *
+ * 脚本放在 `<head>`，靠 `DOMContentLoaded` 排到上游 body 末尾那段内联脚本之后
+ * 执行，因此能读到它写好的 `success`/`error` 态，并用 `onclick` 属性赋值覆盖掉
+ * 上游的内联 handler。
+ */
+const CLOSE_FALLBACK_SCRIPT = `<script>
+			window.addEventListener("DOMContentLoaded", () => {
+				const btn = document.querySelector(".btn");
+				const message = document.getElementById("message");
+				const combo = /mac/i.test(navigator.platform || navigator.userAgent) ? "\\u2318W" : "Ctrl+W";
+				let hinted = false;
+				const hint = () => {
+					if (hinted) return;
+					hinted = true;
+					if (message) message.textContent = "Press " + combo + " to close this tab.";
+					if (btn) {
+						btn.disabled = true;
+						btn.textContent = combo;
+					}
+				};
+				const tryClose = () => {
+					window.close();
+					// 关成功的话这个回调根本不会跑——页面已经没了。
+					setTimeout(hint, 200);
+				};
+				if (btn) btn.onclick = tryClose;
+				// 上游在成功态 3s 时自己试了一次（同样会被拒）。排在它后面补一次，
+				// 于是用户不点按钮也能看到该怎么关。
+				if (document.getElementById("app")?.classList.contains("success")) setTimeout(tryClose, 3200);
+			});
+		</script>`;
+
+/**
  * 页面配色覆盖，追加在上游 `<style>` 之后（同特异性，后来者胜），因此上游那份
  * 样式表一行都不用动。改掉的只有品牌色：`--magenta`/`--iris` 的粉紫收敛到品牌蓝，
  * body 的两团径向光晕跟着变蓝（上游把颜色硬编码在 `background` 里、不走变量，
@@ -61,7 +102,12 @@ const BRAND_STYLE_HTML = `<style>
 			.brand .wordmark {
 				color: ${BRAND_COLOR};
 			}
+			.btn[disabled] {
+				opacity: 0.55;
+				cursor: default;
+			}
 		</style>
+		${CLOSE_FALLBACK_SCRIPT}
 	</head>`;
 
 function replaceOnce(html: string, pattern: RegExp, replacement: string, what: string): string {

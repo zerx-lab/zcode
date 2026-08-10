@@ -23,3 +23,4 @@
 ### Fixed
 - `brand/sync.sh` 结束时 HEAD 停在派生分支 `release`：后续的 changelog / `--fixup` 提交会落在 `release` 上，被下次 `git branch -f release zcode` 无声丢掉。改为 `trap ... EXIT` 无条件送回 `zcode`（失败退出也送，因为要修的东西都在 `zcode`）。
 - `brand/baseline.sh` 对非 `bun test` 命令退化为全量输出比对：基线 worktree 的 `target/` 是冷的，整批 `Compiling …` 与耗时行必然导致 exit=1 的「fork 引入」误判 —— 而 `sync.sh` 恰好在推荐 `baseline.sh bun run check:rs`。改为先抹平路径/耗时再只比信号行（`(fail)` / `error` / `warning:` / `panicked at`），退化到全量比对时明确警告并提示 `--filter`。夹具 `brand/baseline-probe.sh` 双向复验：纯噪声必须判「一致」，真错误必须单独报出。
+- OAuth 回调页的「Close Window」是个死按钮：`window.close()` 只能关掉脚本自己 `window.open` 的窗口，而回调 tab 是授权站点 302 过来的顶层导航，浏览器一律拒绝——上游的 `onclick` 与 3 秒自动关闭都无声失效，用户点了没反应。关不掉是浏览器硬约束、改不了；能修的是「无声」：`oauth-brand.ts` 注入脚本接管 handler（属性赋值覆盖内联 `onclick`），照常先试关闭，200ms 后页面还活着就把文案与按钮切成 `Ctrl+W`／`⌘W` 手动关闭指引；成功态在上游那次尝试之后（3.2s）自动补一次，用户不点按钮也知道怎么关。tab 真的是脚本打开的场景仍然照关不误（已回归验证 `popup.isClosed() === true`）。上游 `oauth.html` 零改动。
