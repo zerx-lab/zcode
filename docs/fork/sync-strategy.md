@@ -142,16 +142,29 @@ bash brand/sync.sh
 
 ```
 brand/
-  apply.ts          # 幂等：按 manifest 渲染/复制到目标路径
+  apply.ts          # manifest + 三种生成方式（copy / render / rewrite），--check 只比对
   verify.ts         # 运行时门禁（见下）
+  gen-logo.ts       # BRAND_RAMP → brand/logo/*.svg
+  gen-hero.ts       # banner.html → brand/assets/hero.png（无头 Chromium 光栅化）
   sync.sh           # 同步脚本
+  baseline.sh       # 上游基线差分
   hooks/pre-commit  # 提交门禁（见下）
-  manifest.json     # 源 → 目标路径映射
-  README.md         # fork 的根 README 源
-  assets/           # icon.svg / hero.png 等（源见 brand/logo/）
+  README.md         # fork 的根 README 源（{{TOKEN}} 模板）
+  assets/           # banner.html（模板）+ hero.png（checked-in 光栅产物）
   logo/             # 字标定稿：zcode-mark.svg / -mono.svg / preview.html
-  templates/        # install.sh / install.ps1 模板
 ```
+
+manifest 就是 `apply.ts` 里的 `MANIFEST` 数组，不单独开 json：`rewrite` 条目要带函数式的锚点规则，拆成数据文件只会把规则和执行分家。三种生成方式：
+
+|方式|用于|失效行为|
+|---|---|---|
+|`copy`|整文件由 fork 拥有（`assets/icon.svg` ← `brand/logo/zcode-mark.svg`、`assets/hero.png`）|源文件缺失即报错|
+|`render`|fork 拥有内容但色值/名字必须取自 `brand.ts`（`README.md`、`assets/banner.html`）|未知 `{{TOKEN}}` 即报错|
+|`rewrite`|上游文件仍是主体，只做定量替换（`scripts/install.sh`、`scripts/install.ps1`）|锚点命中数低于 `min` 即报错|
+
+`rewrite` 而不是「整文件模板」是刻意的：install 脚本上游还在持续改（musl 冒烟、Rosetta bun 检测都是近期加的），拷成模板等于把这些改进永久冻结在 fork 分叉的那一刻。定量锚点让上游改进自动跟随，只有锚点真的消失才需要人工裁决。`\bomp\b` 一条规则同时覆盖资产名、安装路径、提示文案；npm 包名 `@oh-my-pi/pi-coding-agent` 不含该词也不含 `can1357/oh-my-pi`，因此不会被误伤（fork 不发 npm，源码安装改为克隆 `zcode` 分支）。
+
+`hero.png` 是 checked-in 光栅产物而不是 apply 时生成：光栅化要 Chromium，不能挂进每周同步路径。改了 `banner.html` 或 `BRAND_RAMP` 就 `bun brand/gen-hero.ts` 重跑并提交。
 
 ### `brand/hooks/pre-commit` 提交门禁
 
@@ -184,12 +197,33 @@ brand/
 
 | 断言 | 期望 |
 |---|---|
-| `--version` 输出 | fork 产品名 |
-| `getConfigRootDir()` | `~/.<forkname>` |
-| TUI 首屏 | fork logo，不含 `Oh My Pi` |
-| `<scheme>://docs` | 可解析 |
-| `omp://docs` | **仍可解析**（别名兼容） |
-| `<PREFIX>_*` env | 正确映射到 `PI_*` |
+| 源码入口 `--version` | `zcode/<version>` |
+| `getConfigRootDir()` | basename = `.zcode` |
+| `zcode://docs` | 路由可受理 |
+| `omp://docs` | **仍可受理**（别名兼容） |
+| `ZCODE_*` / `OMP_*` env | 都映射到 `PI_*` |
+| `welcome.ts` 的 `PI_LOGO` | === `ZCODE_LOGO`，且 5 行等宽、只含 `█ ▀ ▄` |
+| overlay | `apply.ts --check` 无漂移（仅在已应用的树上校验，zcode 上跳过） |
+
+末条让门禁在两个分支上都有意义：`zcode` 上跳过 overlay 只查接线，`release` 上连产物一起查。
+
+## 发布（`.github/workflows/zcode-release.yml`）
+
+新文件 → 零冲突。上游 `ci.yml` 一行不动：它只在 push `main` / PR 时触发，`v*` tag 的发布走 main 分支推送；本工作流只认 `zcode-v*` tag，两套流程不重叠。
+
+```
+zcode 上打 zcode-v<上游版本>-z<迭代>  →  verify（品牌门禁 + hooks selftest）
+                                      ├─ natives    ubuntu：串行建 6 个非 darwin addon（并发会 OOM）
+                                      ├─ binaries   ubuntu：bun --compile 交叉出 5 个非 darwin 二进制
+                                      ├─ darwin×2   macos-14 / macos-15-intel：自带 bazel addon 构建
+                                      └─ publish    omp-* → zcode-* 改名 + SHA256SUMS.txt + GitHub Release
+```
+
+与上游发布流的差异（fork 只有 GitHub Releases 一条通道）：不发 npm（`@oh-my-pi/*` 包名刻意不改，发布会撞名）、不更新 Homebrew tap、不做 Apple Developer ID 签名/公证（darwin 仍是 ad-hoc 签名）、全部跑 GitHub 托管 runner（上游的 `omp-kata` 自建池本 fork 没有，bazel 靠 `actions/cache` 磁盘缓存，首次冷构建慢是预期内的）。
+
+资产名用 fork 命名（`zcode-linux-x64` / `zcode-windows-x64.exe` …）：overlay 后的 install 脚本正是按这个名字取文件，两边都由 `\bomp\b` 规则与 publish 步的改名保持一致。上游 `ci-release-build-binaries.ts` 因此零改动。
+
+tag 打在 `zcode` 上（不是 `release`）：二进制内容与 overlay 无关，而 `release` 每次同步都会被 `git branch -f` 重建，tag 挂在派生分支上会指向被丢弃的历史。install 一行流指向 `release` 分支的 `scripts/install.*`，那里才有品牌化后的脚本。
 
 ## AI 开发规约（新增文件优先）
 
@@ -219,7 +253,7 @@ brand/
 
 把"去硬编码"重构 PR 回上游（`logger.ts` 用 `APP_NAME`、`init-xdg.ts` 改 import、docs scheme 抽常量）。每合并一个，patch 少一处，最终收敛为「`brand.ts` 一个新文件 + 几行值替换」。
 
-## 当前状态（2026-08-07）
+## 当前状态（2026-08-10）
 
 - [x] `upstream` remote → can1357/oh-my-pi
 - [x] `rerere.enabled` + `rerere.autoUpdate`
@@ -230,6 +264,7 @@ brand/
 - [x] AI 低冲突开发规约：`.omp/rules/fork-low-conflict.md`（alwaysApply；zcode 经 compat 发现，无镜像）
 - [x] `.omp` compat 发现：`BRAND_COMPAT_PROJECT_CONFIG_DIRS` 接入 config.ts / discovery / watchdog；`agents unpack --project` 写路径改 `CONFIG_DIR_NAME`
 - [x] logo 更换：`brand-logo.ts`（终端字标 Heavy Z）+ `welcome.ts` 2 行接线；SVG 定稿在 `brand/logo/`
-- [ ] `assets/**` 图形替换（icon.svg / hero.png / banner.html）—— 依赖 `brand/apply.ts`
-- [ ] `brand/apply.ts` + `verify.ts` + overlay 源（README / install 脚本）
-- [ ] `release` 分支首次生成
+- [x] `brand/apply.ts` + `verify.ts` + overlay 源（fork README / banner / install 脚本改写）
+- [x] `assets/**` 图形替换：`icon.svg` ← `brand/logo/zcode-mark.svg`，`banner.html` ← `brand/assets/banner.html`（模板），`hero.png` ← `bun brand/gen-hero.ts` 光栅化产物
+- [x] `release` 分支首次生成（`git branch -f release zcode` + overlay commit）
+- [x] 发布流水线 `.github/workflows/zcode-release.yml`（`zcode-v*` tag 触发）
