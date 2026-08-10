@@ -42,6 +42,11 @@ if [[ ${1-} == "--clean" ]]; then
 	exit 0
 fi
 
+if [[ ${1-} == "--filter" ]]; then
+	SIGNAL_RE=$2
+	shift 2
+fi
+
 if [[ $# -eq 0 ]]; then
 	sed -n '2,8p' "$0" >&2
 	exit 2
@@ -84,28 +89,55 @@ cp packages/natives/native/*.node "$baseline_dir/packages/natives/native/" 2>/de
 out_dir=$(mktemp -d)
 trap 'rm -rf "$out_dir"' EXIT
 
+# 两侧的路径、耗时、编译进度必然不同（基线 worktree 的 target/ 是冷的），直接比
+# 全量输出等于保证误判。先把这些抹平，再只留「信号行」。
+norm_args=(-e 's/ \[[0-9.]*ms\]$//' -e 's/[0-9][0-9]*\(\.[0-9][0-9]*\)\{0,1\}\(ms\|us\|ns\|s\)\([^a-zA-Z0-9]\|$\)/<T>\3/g')
+for p in "$repo_root" "$baseline_dir"; do
+	norm_args+=(-e "s|$p|<ROOT>|g")
+	for conv in "wslpath -w" "wslpath -m" "cygpath -w" "cygpath -m"; do
+		if command -v "${conv%% *}" >/dev/null 2>&1; then
+			w=$($conv "$p" 2>/dev/null) || continue
+			[[ -n $w ]] && norm_args+=(-e "s|$(printf '%s' "$w" | sed 's|\\\\|\\\\\\\\|g')|<ROOT>|g")
+		fi
+	done
+done
+
+# 信号行：bun test 的失败行，或编译器/运行时的错误行。两者都没有才退回全量比对，
+# 并明确警告结论可能是噪声。--filter 可覆盖。
+SIGNAL_RE=${SIGNAL_RE:-'^\(fail\)|^error|^warning:|^[[:space:]]*error\[|panicked at|^FAIL '}
+
 run_side() {
 	local label=$1 dir=$2
 	shift 2
 	echo "=== $label: $* ===" >&2
 	(cd "$dir" && "$@") >"$out_dir/$label.log" 2>&1 || true
-	# bun test 的失败行；非 test 命令没有该行，退化为全量输出比对
-	sed -e 's/ \[[0-9.]*ms\]$//' "$out_dir/$label.log" | sed -n '/^(fail)/p' | sort >"$out_dir/$label.fails"
+	sed "${norm_args[@]}" "$out_dir/$label.log" >"$out_dir/$label.norm"
+	grep -E "$SIGNAL_RE" "$out_dir/$label.norm" | sort >"$out_dir/$label.fails" || true
 	if [[ ! -s "$out_dir/$label.fails" ]]; then
-		sort "$out_dir/$label.log" >"$out_dir/$label.fails"
+		noisy=1
+		sort "$out_dir/$label.norm" >"$out_dir/$label.fails"
 	fi
 }
+noisy=0
 
 run_side zcode "$repo_root" "$@"
 run_side upstream "$baseline_dir" "$@"
 
+mode="信号行（$SIGNAL_RE）"
+if ((noisy)); then mode="全量输出（两侧都没有信号行）"; fi
 echo
+echo "比对口径: $mode"
 if diff -q "$out_dir/upstream.fails" "$out_dir/zcode.fails" >/dev/null; then
-	echo "两侧输出一致（$(wc -l <"$out_dir/zcode.fails" | tr -d ' ') 行）—— 无 fork 引入的回归。"
+	echo "两侧一致（$(wc -l <"$out_dir/zcode.fails" | tr -d ' ') 行）—— 无 fork 引入的回归。"
 	echo "仍在报错的话，那是上游在本机这个平台上的预存问题，不阻塞同步。"
 	exit 0
 fi
 
 echo "差异（< 仅上游有 / > 仅 zcode 有 = fork 引入，必须修）："
 diff "$out_dir/upstream.fails" "$out_dir/zcode.fails" || true
+if ((noisy)); then
+	echo
+	echo "注意: 走的是全量比对，路径/耗时已抹平但仍可能混入噪声。" >&2
+	echo "用 --filter '<正则>' 指定这条命令的错误行特征后重跑再下结论。" >&2
+fi
 exit 1

@@ -14,6 +14,8 @@ bash brand/sync.sh
 
 它按顺序做：安装 `core.hooksPath` → fetch → 漂移审查 → `git rebase upstream/main` → 重建 `release` → `brand/hooks/selftest.sh` → `bun check` → 全绿才推进 `refs/brand/last-sync`。
 
+脚本中途会切到派生分支 `release` 做 overlay，但**退出时（含失败退出）一定把 HEAD 送回 `zcode`**。后面所有步骤都默认你在 `zcode` 上；万一发现自己在 `release`，先 `git checkout zcode` 再动手 —— 落在 `release` 上的提交会被下次 `git branch -f release zcode` 无声丢掉。
+
 脚本能做的到此为止。**下面全是它做不了的判断题**，也是这条命令存在的理由。
 
 ## 2. 漂移审查：只挑真的品牌串
@@ -39,17 +41,19 @@ rebase 后 `bun check` / `bun test` 报错时，第一个问题永远是「fork 
 
 ```bash
 bash brand/baseline.sh bun test --cwd packages/coding-agent test/discovery/ test/marketplace/
-bash brand/baseline.sh bun run check:rs
+bash brand/baseline.sh bun run check:ts
+bash brand/baseline.sh --filter '^error' bun run check:rs
 ```
 
-脚本在 `upstream/main` 的 worktree 里跑同一条命令，比对失败集：
+脚本在 `upstream/main` 的 worktree 里跑同一条命令，**只比对信号行**（`(fail)` / `error` / `warning:` / `panicked at`），路径与耗时先抹平 —— 基线 worktree 的 `target/` 是冷的，直接比全量输出等于保证误判。每次会打印「比对口径」，看一眼是不是你要的：
 
-- 输出「两侧输出一致」→ 上游预存问题，**不阻塞同步**，记进 `docs/fork/CHANGELOG.md` 即可。
-- 输出差异且 `>` 侧有独有条目 → fork 引入的回归，必须修完再收口。
+- 「两侧一致」→ 上游预存问题，**不阻塞同步**，记进 `docs/fork/CHANGELOG.md` 即可。
+- 有差异且 `>` 侧有独有条目 → fork 引入的回归，必须修完再收口。
+- 口径显示「全量输出（两侧都没有信号行）」→ 结论不可信，用 `--filter '<正则>'` 指定这条命令的错误行特征后重跑。
 
 上次同步靠这一步认定：`crates/pi-walker` 的 8 个 clippy 错（`cfg(windows)` 分支，上游 Linux CI 照不到）和 coding-agent 的 31 个测试失败，两侧逐行完全一致，全是上游预存，与补丁栈零交集。
 
-worktree 复用在 `../omp-baseline`，`bun install` 只在首次或 lockfile 变了时跑。用完 `bash brand/baseline.sh --clean`。
+worktree 复用在 `../omp-baseline`，`bun install` 只在首次或 lockfile 变了时跑。用完 `bash brand/baseline.sh --clean`。改过过滤规则要用 `brand/baseline-probe.sh` 复验（用法写在文件头）。
 
 ## 5. 补丁栈卫生
 
