@@ -110,7 +110,22 @@ bash brand/sync.sh
 ████████████
 ```
 
-**SVG 侧**：`brand/logo/zcode-mark.svg`（品牌渐变，配色与 `welcome.ts` 的 `GRADIENT_STOPS` 5 段一致）、`brand/logo/zcode-mark-mono.svg`（深底单色）。`brand/logo/preview.html` 是本地对照页。这两个文件是 **overlay 源**，由 `brand/apply.ts` 拷到 `assets/icon.svg` 等上游路径 —— `assets/**` 属 overlay 管辖，禁止直接编辑。
+**配色：唯一色值真源是 `packages/utils/src/brand.ts` 的 `BRAND_RAMP`**（5 档 hex，单色相青蓝 hue ≈ 200°，只走明度变化）。想改品牌色，改这一个数组，然后 `bun brand/gen-logo.ts`。所有消费方都从它派生，仓库里没有第二份色值：
+
+|消费面|怎么拿到色|
+|---|---|
+|终端 logo / splash 水面|`brand-logo.ts` 的 `BRAND_GRADIENT_STOPS` = `BRAND_RAMP_RGB`（模块加载时从 hex 解析），上游 `welcome.ts` 的两个同名常量收缩成两行取值|
+|无 truecolor 兜底|`BRAND_RAMP_256`（xterm 索引，与 hex 独立但同为蓝）|
+|OAuth 回调页字标 + 页面配色|`oauth-brand.ts` 运行时铺 stop、拼 `RRGGBBAA` 光晕|
+|`brand/logo/*.svg`|`bun brand/gen-logo.ts` 生成的落盘产物|
+
+落盘 SVG 是唯一「可能忘记同步」的缝，由 `packages/utils/test/brand-ramp.test.ts` 守住：它拿 `renderMarkSvg(BRAND_RAMP)` 和磁盘上的文件逐字节比对，改了色板没重跑脚本就红。同一个测试还钉住 hue 落在 185°–215°，防止有人往品牌里塞回第二个色相。
+
+档数必须保持 5：`gradientEscape` 按 `t * (stops.length - 1)` 分段插值，改档数会变动 splash 水面与 logo 的色带节奏。
+
+**SVG 侧**：`brand/logo/zcode-mark.svg`（品牌蓝渐变）、`brand/logo/zcode-mark-mono.svg`（深底纯白，不含品牌色故不随色板变）。`brand/logo/preview.html` 是本地对照页，用 `<img src>` 直引这两个真源——曾经三份内联副本，改色时必然只改一半。这两个 SVG 是 **overlay 源**，由 `brand/apply.ts` 拷到 `assets/icon.svg` 等上游路径 —— `assets/**` 属 overlay 管辖，禁止直接编辑。
+
+**OAuth 回调页**：`packages/ai/src/registry/oauth/oauth-brand.ts` 是 web 侧品牌层。它按结构锚点（`<title>`、`.brand`、`</head>`）改写上游 `oauth.html`，上游那份文件一行不动。
 
 ### `omp://` scheme：改主名 + 保留 `omp` 隐藏别名
 

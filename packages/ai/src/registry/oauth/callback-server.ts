@@ -12,8 +12,10 @@
  */
 import * as AIError from "../../error";
 import templateHtml from "./oauth.html" with { type: "text" };
+import { brandOAuthPage } from "./oauth-brand";
 import type { OAuthController, OAuthCredentials } from "./types";
 
+const BRANDED_TEMPLATE = brandOAuthPage(templateHtml as unknown as string);
 const DEFAULT_TIMEOUT = 300_000;
 const DEFAULT_HOSTNAME = "localhost";
 const CALLBACK_PATH = "/callback";
@@ -440,13 +442,10 @@ export abstract class OAuthCallbackFlow {
 			});
 		}
 
-		return new Response(
-			(templateHtml as unknown as string).replaceAll("__OAUTH_STATE__", JSON.stringify(resultState)),
-			{
-				status: resultState.ok ? 200 : 500,
-				headers: { "Content-Type": "text/html" },
-			},
-		);
+		return new Response(BRANDED_TEMPLATE.replaceAll("__OAUTH_STATE__", JSON.stringify(resultState)), {
+			status: resultState.ok ? 200 : 500,
+			headers: { "Content-Type": "text/html" },
+		});
 	}
 
 	/**
