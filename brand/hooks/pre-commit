@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Fork 提交门禁。安装: git config core.hooksPath brand/hooks（brand/sync.sh 幂等执行）。
+#
+# 拦截「构建产物被误提交」。scripts/build-binary.ts 在编译期把三个 checked-in
+# 占位文件就地改写成 populated 形态，并在 finally 里 reset 回去；构建被 Ctrl-C
+# 或崩溃打断时 reset 不执行，随后一次 `git add -A` 就把产物提交进补丁栈。
+#
+# 已发生过一次：populated 的 embedded-addon.js 让 loader-state.js 的
+# detectCompiledBinary() 在开发态返回 true，resolveLoaderCandidates() 于是把
+# ~/.zcode/natives/<version> 排在 nativeDir 之前——陈旧的已发布 .node 会静默抢在
+# 本地新构建之前被加载；同时夹带了一个 27 MB 的 tar.gz 进历史。
+#
+# rebase / merge / cherry-pick 重放不触发 pre-commit，因此不会干扰上游同步。
+set -euo pipefail
+
+fail=0
+note() { printf '%s\n' "$1" >&2; }
+
+# populated 形态的判据：两个占位模块都用 `with { type: "file" }` 引产物；
+# 占位形态不含该导入。比逐字节比对 stub 稳，上游改注释/typedef 不会误报。
+EMBED_MARKER='with { type: "file" }'
+
+while IFS= read -r -d '' file; do
+	case "$file" in
+	packages/natives/native/embedded-addons.*.tar.gz)
+		note "构建产物不得提交: $file"
+		note "  → git rm --cached -- '$file' && rm -f -- '$file'"
+		fail=1
+		;;
+	packages/natives/native/embedded-addon.js | packages/coding-agent/src/utils/mupdf-wasm-embed.ts)
+		case "$(git show ":$file")" in
+		*"$EMBED_MARKER"*)
+			note "构建占位文件处于 populated 状态，不得提交: $file"
+			note "  → bun --cwd=packages/natives run gen:native:reset"
+			note "  → bun --cwd=packages/coding-agent run gen:mupdf:reset"
+			fail=1
+			;;
+		esac
+		;;
+	packages/stats/src/embedded-client.generated.txt)
+		if [[ "$(git cat-file -s ":$file")" != "0" ]]; then
+			note "构建占位文件处于 populated 状态，不得提交: $file"
+			note "  → bun --cwd=packages/stats run gen:stats:reset"
+			fail=1
+		fi
+		;;
+	esac
+done < <(git diff --cached --name-only --diff-filter=ACM -z)
+
+if ((fail)); then
+	note ""
+	note "重置后重新 git add。确需绕过: git commit --no-verify"
+	exit 1
+fi

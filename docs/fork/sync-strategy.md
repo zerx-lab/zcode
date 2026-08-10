@@ -130,12 +130,34 @@ brand/
   apply.ts          # 幂等：按 manifest 渲染/复制到目标路径
   verify.ts         # 运行时门禁（见下）
   sync.sh           # 同步脚本
+  hooks/pre-commit  # 提交门禁（见下）
   manifest.json     # 源 → 目标路径映射
   README.md         # fork 的根 README 源
   assets/           # icon.svg / hero.png 等（源见 brand/logo/）
   logo/             # 字标定稿：zcode-mark.svg / -mono.svg / preview.html
   templates/        # install.sh / install.ps1 模板
 ```
+
+### `brand/hooks/pre-commit` 提交门禁
+
+安装：`git config core.hooksPath brand/hooks`（`brand/sync.sh` 幂等执行，clone 后跑一次同步即生效）。
+
+拦截的是**构建产物误提交**，不是代码风格。`scripts/build-binary.ts` 在编译期把三个 checked-in 占位文件就地改写成 populated 形态，`finally` 里再 reset 回去；构建被 Ctrl-C 或崩溃打断时 reset 不执行，随后一次 `git add -A` 就把产物提交进补丁栈。
+
+| 受保护路径 | 占位形态 | populated 判据 |
+|---|---|---|
+| `packages/natives/native/embedded-addon.js` | `embeddedAddon = null` | 含 `with { type: "file" }` |
+| `packages/coding-agent/src/utils/mupdf-wasm-embed.ts` | `return undefined` | 含 `with { type: "file" }` |
+| `packages/stats/src/embedded-client.generated.txt` | 空文件 | 非零字节 |
+| `packages/natives/native/embedded-addons.*.tar.gz` | 不该存在 | 被 staged 即拒绝 |
+
+判据取「populated 形态特有的 import」而非逐字节比对 stub —— 上游改注释/typedef 不会误报。
+
+侧产物用 `.gitignore` 兜底：`packages/natives/native/.gitignore`（新文件，零冲突）补上 `embedded-addons.*.tar.gz`。这是上游遗漏（同类的 `*.node` 与 `src/utils/mupdf-wasm.wasm` 上游都已 ignore），可 PR 回上游。
+
+**为什么这条门禁必要**：populated 的 `embedded-addon.js` 会让 `loader-state.js` 的 `detectCompiledBinary()` 在开发态返回 `true`（该函数以 embedded-addon 是否为 null 作为编译态的权威判据），`resolveLoaderCandidates()` 于是把 `~/.zcode/natives/<version>` 排在 `nativeDir` **之前** —— 陈旧的已发布 `.node` 静默抢在本地新构建之前被加载，且 `shouldStageNodeModulesAddon()` 会跳过 Windows 的 node_modules 暂存路径。已实际发生过一次（同时夹带 27 MB tar.gz 进历史）。
+
+rebase / cherry-pick 重放不触发 `pre-commit`（已实测），因此门禁不干扰上游同步；确需绕过用 `git commit --no-verify`。
 
 ### `brand/verify.ts` 运行时门禁
 

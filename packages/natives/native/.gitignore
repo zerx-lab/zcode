@@ -1,0 +1,6 @@
+# Build output of `bun --cwd=packages/natives run gen:native`, consumed by
+# `bun build --compile` and deleted again by `gen:native:reset`. An interrupted
+# binary build leaves it behind; it must never be committed (tens of MB).
+# Upstream already ignores the sibling `*.node` artifacts and the mupdf wasm
+# copy, but missed this one.
+embedded-addons.*.tar.gz

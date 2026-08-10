@@ -4,6 +4,9 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+# 提交门禁（幂等）：拦截被中断的 binary build 留下的 populated 占位文件
+git config core.hooksPath brand/hooks
+
 git fetch upstream --no-tags
 
 # 首次建立漂移基线（可动 ref，全绿后才推进）
