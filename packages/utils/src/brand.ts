@@ -76,6 +76,14 @@ export const BRAND_PROJECT_CONFIG_DIR_NAMES: readonly string[] = [
 ];
 
 /**
+ * 用户级配置兼容目录（只读发现，不作为写入目标），相对 `$HOME`。
+ * 用户从上游 omp 切到 zcode 时，`~/.omp/agent/{rules,skills,commands,agents,…}` 借此
+ * 继续生效、免迁移。写路径仍然只落 native `.zcode`——sessions / settings / auth 两个
+ * 品牌各自一份，绝不能混写。
+ */
+export const BRAND_COMPAT_USER_CONFIG_DIRS: readonly string[] = [".omp"];
+
+/**
  * 粘性解析项目级配置文件（cwd 必传，供 dirs.ts 使用，避免模块循环）：
  * 返回首个已存在的候选（native 优先，compat 兜底），都不存在时返回 native 路径。
  * 读写共用同一解析，避免"定义在 .omp、状态写进 .zcode"的数据分家。
