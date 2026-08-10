@@ -2,11 +2,6 @@
 
 ## [Unreleased]
 
-### Added
-- Branded OAuth callback page via structural rewrite of upstream `oauth.html` (title, mark, cyan-blue chrome) without editing the template
-
-### Fixed
-- OAuth callback "Close Window" dead button: inject fallback that tries window.close then shows Ctrl+W/⌘W hint when the browser blocks closing a non-script-opened tab
 ## [17.2.12] - 2026-08-08
 
 ### Fixed

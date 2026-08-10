@@ -237,9 +237,13 @@ tag 打在 `zcode` 上（不是 `release`）：二进制内容与 overlay 无关
 | `~/.zcode/agent/AGENTS.md`（用户级） | ❌ | 不进仓库，换机器/协作者即失效 |
 | **`.omp/rules/`（项目级 rules）** | ✅ | 上游虽跟踪 `.omp/{commands,skills}` 但没有 `rules/` 子目录 → 新文件零冲突；`alwaysApply: true` 每个会话自动注入；进仓库、随 clone 生效 |
 
-实现：单份 `.omp/rules/fork-low-conflict.md`。上游 omp 原生读取 `.omp/`；zcode 经 **`.omp` compat 发现**（`brand.ts` 的 `BRAND_COMPAT_PROJECT_CONFIG_DIRS`，接入 `config.ts` priorityList 与 `discovery/builtin.ts` getConfigDirs）同时发现 `.zcode/` 与 `.omp/`，按 name 去重——上游 tracked 的 `.omp/{commands,skills}` 更新对 zcode 免维护跟随，用户已有 `.omp/` 项目配置无缝兼容，且无需维护任何镜像文件。规则内容：新功能=新文件、接线只走注册表、品牌串只取 `brand.ts`、禁改热点文件清单、扩展点速查表。
+实现：单份 `.omp/rules/fork-low-conflict.md`。上游 omp 原生读取 `.omp/`；zcode 经 **`.omp` compat 发现**（`brand.ts` 的 `BRAND_COMPAT_PROJECT_CONFIG_DIRS`，接入 `config.ts` priorityList 与 `discovery/builtin.ts` getConfigDirs）同时发现 `.zcode/` 与 `.omp/`，按 name 去重——上游 tracked 的 `.omp/{commands,skills}` 更新对 zcode 免维护跟随，用户已有 `.omp/` 项目配置无缝兼容，且无需维护任何镜像文件。规则内容不是禁令清单而是**成本排序**：动手前三问 + 落点成本表（新增文件 → 注册表接线 → 上游内联 → 上游热文件）+ 5 条硬约束 + 扩展点速查表；目的是让每次改动自己算 rebase 账，而不是靠「禁止」把人卡死在需要改上游的场景里。
+
+项目规则的祖先解析：`discovery/builtin.ts` 的 `loadRules` 按 cwd → repoRoot 走祖先（与同文件 skills 一致），否则从 `packages/coding-agent/` 这类子目录启动会话时，仓库根 `.omp/rules/` 整个不注入。边界先过 `isAncestorDir()` 校验再交给 `getAncestorDirs()`（后者只在完全相等时停，坏边界=扫到文件系统根）。
 
 `.omp` compat 读取面（全部经 `BRAND_PROJECT_CONFIG_DIR_NAMES` / `getProjectAgentDirCandidates` 查表）：`config.ts` priorityList、`discovery/builtin.ts` getConfigDirs / 项目 mcp.json / RULES.md walk、`discovery/helpers.ts` 项目插件 registry anchor、`advisor/watchdog.ts`、`secrets/index.ts`、`discovery/omp-extension-roots.ts`、`discovery/ssh.ts`、`config/prompt-templates.ts`。
+
+**用户级 compat 只覆盖声明式上下文**（`BRAND_COMPAT_USER_CONFIG_DIRS` + `getUserAgentDirCandidates()`，接线点 `builtin.ts` 的 `compatUserAgentPaths`）：`~/.omp/agent/` 下的 `rules/`、`RULES.md`、`AGENTS.md`、`SYSTEM.md`。**不接进通用 `getConfigDirs()`** —— 那张表同时喂 extensions / hooks / custom tools / `settings.json`，合并另一个品牌的 agent 目录等于启动时执行它的扩展代码、混进它的设置；sessions / auth / MCP / settings 一律 native-only。候选从 `getConfigRootDir()` 切分品牌段得出而不调 `os.homedir()`（`dirs.ts` 的 `RESOLVER_HOME` 在模块加载时锚死 home，mock 过 homedir 的调用方会让两者不一致、compat 静默消失）；只在默认布局 `agentDir === <configRoot>/agent` 下镜像。
 
 **写路径 = 粘性解析**（`brand.ts` 的 `resolveProjectConfigFileIn`，接入 `dirs.ts` 的 `getMCPConfigPath`/`getSSHConfigPath`、`settings.ts` 项目 config.yml、`omfg-controller` 规则目录）：写到"文件/目录已存在的候选"（legacy 项目继续整体活在 `.omp/`），都不存在才用 native `.zcode`——避免"定义在 .omp、状态写进 .zcode"的数据分家。settings 的解析结果按 load 缓存，避免备份-重命名后写目标漂移。
 
