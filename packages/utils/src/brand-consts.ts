@@ -28,6 +28,21 @@ export const BRAND_MARK = "Z";
 export const BRAND_COLLAB_WEB_URL = "https://collab.zerx.dev";
 
 /**
+ * 自托管 collab relay 默认地址（上游 `DEFAULT_RELAY_URL = "wss://my.omp.sh"`，
+ * 定义在 pi-wire）。只覆盖 `collab.relayUrl` 的**设置默认值**；pi-wire 常量本身
+ * 不改——裸链接（`<roomId>.<key>`）仍按上游语义解析到上游公共 relay，zcode host
+ * 生成的链接始终携带完整主机名，不受影响。
+ */
+export const BRAND_COLLAB_RELAY_URL = "wss://collab-server.zerx.dev";
+
+/**
+ * 自托管 share 上传/viewer 基址（上游 `DEFAULT_SHARE_URL = "https://my.omp.sh/s"`）。
+ * 服务端契约：`POST <base>` → `{id}`、`GET <base>/<id>` viewer、`GET <base>/<id>/raw`
+ * 密文（见 packages/collab-server）。链接形如 `<base>/<id>#<key>`。
+ */
+export const BRAND_SHARE_URL = "https://collab-server.zerx.dev/s";
+
+/**
  * 品牌色板：**全站唯一色值真源**。单色相青蓝（hue ≈ 200°），只走明度/饱和度变化。
  *
  * 消费方全部从这里派生，没有第二份副本：

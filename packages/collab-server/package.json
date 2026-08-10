@@ -1,0 +1,41 @@
+{
+	"type": "module",
+	"name": "@zcode/collab-server",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Self-hosted zcode collab relay + share blob store + dashboard (fork-only, not published)",
+	"main": "./src/index.ts",
+	"scripts": {
+		"dev": "bun run src/index.ts",
+		"start": "bun run src/index.ts",
+		"build": "bun run scripts/build.ts",
+		"build:linux": "bun run scripts/build.ts --compile-linux",
+		"test": "bun test --parallel",
+		"check": "biome check . && bun run check:types",
+		"check:types": "tsgo -p tsconfig.json --noEmit && tsgo -p tsconfig.client.json --noEmit",
+		"lint": "biome lint .",
+		"fix": "biome check --write --unsafe .",
+		"fmt": "biome format --write ."
+	},
+	"dependencies": {
+		"@oh-my-pi/pi-utils": "catalog:",
+		"@oh-my-pi/pi-wire": "catalog:",
+		"@tailwindcss/node": "catalog:",
+		"@tanstack/react-query": "^5.0.0",
+		"@tanstack/react-router": "^1.0.0",
+		"hono": "^4.0.0",
+		"lucide-react": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"tailwindcss": "catalog:"
+	},
+	"devDependencies": {
+		"@oh-my-pi/pi-coding-agent": "catalog:",
+		"@types/bun": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:"
+	},
+	"engines": {
+		"bun": ">=1.3.14"
+	}
+}

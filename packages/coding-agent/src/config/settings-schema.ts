@@ -1,8 +1,6 @@
 import { THINKING_EFFORTS } from "@oh-my-pi/pi-ai";
-import { BRAND_COLLAB_WEB_URL } from "@oh-my-pi/pi-utils/brand";
-import { DEFAULT_SHARE_URL } from "@oh-my-pi/pi-wire";
+import { BRAND_COLLAB_RELAY_URL, BRAND_COLLAB_WEB_URL, BRAND_SHARE_URL } from "@oh-my-pi/pi-utils/brand";
 import { SHAPE_VARIANT_NAMES } from "@oh-my-pi/snapcompact";
-import { DEFAULT_RELAY_URL } from "../collab/protocol";
 import { LANGUAGE_SETTING_OPTIONS, LANGUAGE_SETTING_VALUES } from "../i18n/constants";
 import { DEFAULT_LIVE_VOICE, LIVE_VOICE_OPTIONS, LIVE_VOICE_VALUES } from "../live/voices";
 import { DEFAULT_STT_MODEL_KEY, STT_MODEL_OPTIONS, STT_MODEL_VALUES } from "../stt/models";
@@ -2018,7 +2016,7 @@ export const SETTINGS_SCHEMA = {
 	// Collab
 	"collab.relayUrl": {
 		type: "string",
-		default: DEFAULT_RELAY_URL,
+		default: BRAND_COLLAB_RELAY_URL,
 		ui: {
 			tab: "interaction",
 			group: "Collab",
@@ -2052,7 +2050,7 @@ export const SETTINGS_SCHEMA = {
 
 	"share.serverUrl": {
 		type: "string",
-		default: DEFAULT_SHARE_URL,
+		default: BRAND_SHARE_URL,
 		ui: {
 			tab: "interaction",
 			group: "Collab",
