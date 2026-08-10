@@ -19,6 +19,15 @@ export const BRAND_DISPLAY_NAME = "zcode";
 export const BRAND_MARK = "Z";
 
 /**
+ * 自托管的 collab 浏览器 guest UI 地址（上游默认空 → 从 `collab.relayUrl` 推导出
+ * `https://my.omp.sh`）。这里只覆盖 **UI 静态站**；WebSocket relay 仍由
+ * `collab.relayUrl` 决定，两者可以不同源（`formatCollabWebLink` 把 relay 链接放进
+ * fragment）。部署要求：HTTPS（WebCrypto 需要 secure context）、无 query/fragment、
+ * 无尾斜杠。
+ */
+export const BRAND_COLLAB_WEB_URL = "https://collab.zerx.dev";
+
+/**
  * 品牌色板：**全站唯一色值真源**。单色相青蓝（hue ≈ 200°），只走明度/饱和度变化。
  *
  * 消费方全部从这里派生，没有第二份副本：

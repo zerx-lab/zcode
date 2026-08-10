@@ -1,4 +1,5 @@
 import { THINKING_EFFORTS } from "@oh-my-pi/pi-ai";
+import { BRAND_COLLAB_WEB_URL } from "@oh-my-pi/pi-utils/brand";
 import { DEFAULT_SHARE_URL } from "@oh-my-pi/pi-wire";
 import { SHAPE_VARIANT_NAMES } from "@oh-my-pi/snapcompact";
 import { DEFAULT_RELAY_URL } from "../collab/protocol";
@@ -2028,7 +2029,7 @@ export const SETTINGS_SCHEMA = {
 
 	"collab.webUrl": {
 		type: "string",
-		default: "",
+		default: BRAND_COLLAB_WEB_URL,
 		ui: {
 			tab: "interaction",
 			group: "Collab",
