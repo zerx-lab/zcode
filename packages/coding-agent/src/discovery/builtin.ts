@@ -4,8 +4,16 @@
  * Primary provider for OMP native configs. Supports all capabilities.
  */
 import * as path from "node:path";
-import { getAgentDir, logger, parseFrontmatter, tryParseJson } from "@oh-my-pi/pi-utils";
+import {
+	getAgentDir,
+	logger,
+	parseFrontmatter,
+	pathIsWithin,
+	resolveEquivalentPath,
+	tryParseJson,
+} from "@oh-my-pi/pi-utils";
 import { BRAND_COMPAT_PROJECT_CONFIG_DIRS } from "@oh-my-pi/pi-utils/brand";
+import { getUserAgentDirCandidates } from "@oh-my-pi/pi-utils/brand-dirs";
 import { YAML } from "bun";
 import { getManagedSkillsDir, MANAGED_SKILLS_PROVIDER_ID } from "../autolearn/managed-skills";
 import { registerProvider } from "../capability";
@@ -67,12 +75,31 @@ async function getConfigDirs(ctx: LoadContext): Promise<Array<{ dir: string; lev
 	}
 	// Native user config is profile-scoped: getAgentDir() points at the active
 	// profile's agent dir (~/.omp/profiles/<name>/agent), like sessions and MCP.
+	//
+	// Deliberately NOT brand-compat: this table also feeds extensions, hooks,
+	// custom tools and settings.json. Merging another brand's agent dir here
+	// would auto-execute its extension modules and blend its settings. Compat is
+	// scoped to declarative context files only — see compatUserAgentPaths().
 	const userDir = await ifNonEmptyDir(getAgentDir());
 	if (userDir) {
 		result.push({ dir: userDir, level: "user" });
 	}
 
 	return result;
+}
+
+/**
+ * Fork compat: user-scope candidates for **declarative, non-executable** context
+ * files that users may still keep in the pre-existing `.omp` agent dir. Excludes
+ * the native dir (already covered by getConfigDirs() / getAgentDir()).
+ *
+ * Covers `rules/`, `RULES.md`, `AGENTS.md`, `SYSTEM.md` — prompt material with no
+ * execution semantics. Extensions, hooks, tools, settings, MCP and sessions stay
+ * strictly native-only so the two brands never share executable or stateful config.
+ */
+function compatUserAgentPaths(...seg: string[]): string[] {
+	const [, ...compat] = getUserAgentDirCandidates();
+	return compat.map(dir => path.join(dir, ...seg));
 }
 
 function getAncestorDirs(cwd: string, stopAt?: string | null): Array<{ dir: string; depth: number }> {
@@ -249,15 +276,17 @@ registerProvider<MCPServer>(mcpCapability.id, {
 async function loadSystemPrompt(ctx: LoadContext): Promise<LoadResult<SystemPrompt>> {
 	const items: SystemPrompt[] = [];
 
-	const userPath = path.join(getAgentDir(), "SYSTEM.md");
-	const userContent = await readFile(userPath);
-	if (userContent) {
-		items.push({
-			path: userPath,
-			content: userContent,
-			level: "user",
-			_source: createSourceMeta(PROVIDER_ID, userPath, "user"),
-		});
+	for (const userPath of [path.join(getAgentDir(), "SYSTEM.md"), ...compatUserAgentPaths("SYSTEM.md")]) {
+		const userContent = await readFile(userPath);
+		if (userContent) {
+			items.push({
+				path: userPath,
+				content: userContent,
+				level: "user",
+				_source: createSourceMeta(PROVIDER_ID, userPath, "user"),
+			});
+			break;
+		}
 	}
 
 	const nearestProjectConfigDir = await findNearestProjectConfigDir(ctx.cwd, ctx.repoRoot);
@@ -380,9 +409,42 @@ async function loadRules(ctx: LoadContext): Promise<LoadResult<Rule>> {
 	const items: Rule[] = [];
 	const warnings: string[] = [];
 
-	for (const { dir, level } of await getConfigDirs(ctx)) {
-		const rulesDir = path.join(dir, "rules");
-		const result = await loadFilesFromDir<Rule>(ctx, rulesDir, PROVIDER_ID, level, {
+	// Project rules walk cwd → repoRoot so a session started in a subdirectory of a
+	// monorepo still sees the repo's own rules — getConfigDirs() probes `ctx.cwd`
+	// alone, which silently drops them (including any alwaysApply rule the repo
+	// relies on). RULES.md already resolves by ancestor walk
+	// (findNearestProjectConfigDir below); this makes `rules/` consistent with it.
+	//
+	// The repo root is the only boundary. Skills fall back to `ctx.home`, but the
+	// risk is asymmetric: missing a skill costs a capability, while inheriting a
+	// stranger's rule silently constrains every turn. No repo → the user is
+	// standing in an ad-hoc directory and only that directory speaks for it.
+	//
+	// Both sides go through the same normalization before comparing: `ctx.cwd` may be
+	// relative while findRepoRoot() returns absolute, `pathIsWithin` compares
+	// realpath'd paths, and getAncestorDirs stops on exact string equality. Mixing
+	// forms silently degrades to "cwd only" — or, with a boundary that never matches,
+	// to "walk to the filesystem root" (macOS /tmp → /private/tmp is exactly that).
+	//
+	// User scope stays split: native agent dir plus declarative-only compat dirs.
+	const cwd = resolveEquivalentPath(ctx.cwd);
+	const walkBoundary = ctx.repoRoot && pathIsWithin(ctx.repoRoot, cwd) ? resolveEquivalentPath(ctx.repoRoot) : null;
+	const projectBases = walkBoundary ? getAncestorDirs(cwd, walkBoundary) : [{ dir: cwd, depth: 0 }];
+	const ruleDirs: Array<{ dir: string; level: "user" | "project" }> = [
+		...projectBases.flatMap(({ dir }) =>
+			[PATHS.projectDir, ...BRAND_COMPAT_PROJECT_CONFIG_DIRS].map(dirName => ({
+				dir: path.join(dir, dirName, "rules"),
+				level: "project" as const,
+			})),
+		),
+		...[path.join(getAgentDir(), "rules"), ...compatUserAgentPaths("rules")].map(dir => ({
+			dir,
+			level: "user" as const,
+		})),
+	];
+
+	for (const { dir, level } of ruleDirs) {
+		const result = await loadFilesFromDir<Rule>(ctx, dir, PROVIDER_ID, level, {
 			extensions: ["md", "mdc"],
 			transform: (name, content, path, source) =>
 				buildRuleFromMarkdown(name, content, path, source, { stripNamePattern: /\.(md|mdc)$/ }),
@@ -396,9 +458,13 @@ async function loadRules(ctx: LoadContext): Promise<LoadResult<Rule>> {
 	// the current turn so they keep hold across long conversations".
 	// User scope:    ~/.omp/agent/RULES.md
 	// Project scope: nearest .omp/RULES.md walking up from cwd to repoRoot
-	const userRulesFile = path.join(getAgentDir(), "RULES.md");
-	const userRule = await loadStickyRulesFile(userRulesFile, "user");
-	if (userRule) items.push(userRule);
+	for (const userRulesFile of [path.join(getAgentDir(), "RULES.md"), ...compatUserAgentPaths("RULES.md")]) {
+		const userRule = await loadStickyRulesFile(userRulesFile, "user");
+		if (userRule) {
+			items.push(userRule);
+			break;
+		}
+	}
 
 	const nearestProjectConfigDir = await findNearestProjectConfigDir(ctx.cwd, ctx.repoRoot);
 	if (nearestProjectConfigDir) {
@@ -914,15 +980,17 @@ async function loadContextFiles(ctx: LoadContext): Promise<LoadResult<ContextFil
 	const items: ContextFile[] = [];
 	const warnings: string[] = [];
 
-	const userPath = path.join(getAgentDir(), "AGENTS.md");
-	const userContent = await readFile(userPath);
-	if (userContent) {
-		items.push({
-			path: userPath,
-			content: userContent,
-			level: "user",
-			_source: createSourceMeta(PROVIDER_ID, userPath, "user"),
-		});
+	for (const userPath of [path.join(getAgentDir(), "AGENTS.md"), ...compatUserAgentPaths("AGENTS.md")]) {
+		const userContent = await readFile(userPath);
+		if (userContent) {
+			items.push({
+				path: userPath,
+				content: userContent,
+				level: "user",
+				_source: createSourceMeta(PROVIDER_ID, userPath, "user"),
+			});
+			break;
+		}
 	}
 
 	const nearestProjectConfigDir = await findNearestProjectConfigDir(ctx.cwd, ctx.repoRoot);
