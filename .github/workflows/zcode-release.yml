@@ -203,7 +203,7 @@ jobs:
               generate_release_notes: true
               body: |
                  `zcode` 是 [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) 的换品牌二次开发分支，
-                 功能随上游每周 rebase 跟进，本仓只改品牌面与发布通道。
+                 功能随上游每周 rebase 跟进。
 
                  ## 安装
 
