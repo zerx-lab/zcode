@@ -39,6 +39,16 @@ describe("brandOAuthPage", () => {
 		expect(branded).toContain("--error: oklch(0.66 0.22 25)");
 	});
 
+	it("ships the close fallback that overrides the upstream dead close button", () => {
+		// 浏览器拒绝关闭非 script-opened 的 tab，上游 onclick 因此无声失效。
+		// 我们必须**接管** handler（属性赋值覆盖内联属性），而不是并排再挂一个
+		// addEventListener——那样上游那次失败的 close 仍会先跑。
+		expect(branded).toContain("btn.onclick = tryClose");
+		// 注入点在 </head> 之前；DOMContentLoaded 保证它排在上游 body 末尾的
+		// 内联脚本之后，从而能读到已写好的 success/error 态。
+		expect(branded.indexOf("DOMContentLoaded")).toBeLessThan(branded.indexOf("</head>"));
+	});
+
 	it("preserves the __OAUTH_STATE__ injection contract the callback server depends on", () => {
 		// callback-server.ts 用 replaceAll 注入 JSON 状态；占位符没了页面就永远停在
 		// "Authentication" 空白态。
