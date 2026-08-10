@@ -11,6 +11,7 @@ import {
 	setTerminalTitleState,
 } from "@oh-my-pi/pi-coding-agent/utils/title-generator";
 import { logger, setTerminalHeadless } from "@oh-my-pi/pi-utils";
+import { BRAND_MARK } from "@oh-my-pi/pi-utils/brand";
 import { mockWindowsConsoleTitle, type WindowsConsoleTitleMock } from "./terminal-title-test-utils";
 
 function getModelOrThrow(id: string): Model<Api> {
@@ -720,7 +721,7 @@ describe("terminal title runtime", () => {
 			writes.length = 0;
 
 			setTerminalTitleState("working");
-			expect(emittedTitles()).toEqual(["π : windows-project"]);
+			expect(emittedTitles()).toEqual([`${BRAND_MARK} : windows-project`]);
 
 			writes.length = 0;
 			vi.advanceTimersByTime(400);
@@ -740,7 +741,7 @@ describe("terminal title runtime", () => {
 			writes.length = 0;
 
 			setTerminalTitleState("working");
-			expect(emittedTitles()).toEqual(["π : wsl-project"]);
+			expect(emittedTitles()).toEqual([`${BRAND_MARK} : wsl-project`]);
 
 			writes.length = 0;
 			vi.advanceTimersByTime(400);
