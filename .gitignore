@@ -90,3 +90,4 @@ packages/coding-agent/bench/boot-baseline.json
 /bazel-pi
 /bazel-oh-my-pi
 /.bazelrc.user
+packages/collab-server/.bun-cache/
