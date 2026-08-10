@@ -215,3 +215,23 @@ describe("loadSlashCommands dispatch wiring", () => {
 		}
 	});
 });
+
+describe("project command discovery from a subdirectory", () => {
+	test("walks up to the repo root but not past it", async () => {
+		const base = await fs.mkdtemp(path.join(os.tmpdir(), "cmd-walk-"));
+		try {
+			await Bun.write(path.join(base, "above", ".omp", "commands", "outside.md"), "Outside command\n");
+			await fs.mkdir(path.join(base, "above", "repo", ".git"), { recursive: true });
+			await Bun.write(path.join(base, "above", "repo", ".omp", "commands", "rooted.md"), "Rooted command\n");
+			const subdir = path.join(base, "above", "repo", "packages", "sub");
+			await fs.mkdir(subdir, { recursive: true });
+
+			const commands = await loadSlashCommands({ cwd: subdir });
+			const names = new Set(commands.map(cmd => cmd.name));
+			expect(names.has("rooted")).toBe(true);
+			expect(names.has("outside")).toBe(false);
+		} finally {
+			await fs.rm(base, { recursive: true, force: true });
+		}
+	});
+});
