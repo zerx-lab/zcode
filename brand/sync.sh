@@ -45,7 +45,12 @@ else
 	echo "(brand/verify.ts 尚未实现，跳过运行时门禁)"
 fi
 bash brand/hooks/selftest.sh
-bun check
+bun check || {
+	echo "bun check 失败。先做基线差分再改代码，别靠读 diff 猜是不是 fork 引入的：" >&2
+	echo "  bash brand/baseline.sh bun run check:ts" >&2
+	echo "  bash brand/baseline.sh bun run check:rs" >&2
+	exit 1
+}
 
 # 5) 推进漂移基线
 git update-ref refs/brand/last-sync upstream/main
