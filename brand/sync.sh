@@ -44,6 +44,7 @@ if [[ -f brand/verify.ts ]]; then
 else
 	echo "(brand/verify.ts 尚未实现，跳过运行时门禁)"
 fi
+bash brand/hooks/selftest.sh
 bun check
 
 # 5) 推进漂移基线
