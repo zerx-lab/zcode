@@ -6,6 +6,7 @@ import type { SettingPath, SettingValue } from "../config/settings";
 import { settings } from "../config/settings";
 import { parseExportArgs } from "../export/html/args";
 import { shareSession } from "../export/share";
+import { t, tf } from "../i18n";
 import { theme } from "../modes/theme/theme";
 import type { InteractiveModeContext } from "../modes/types";
 import { extractLastCodeBlock, extractLastCommand } from "../modes/utils/copy-targets";
@@ -69,10 +70,11 @@ export const BUILTIN_COLLABORATION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpe
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
 			const stats = runtime.ctx.session.getAdvisorStats();
-			if (stats.active && stats.advisors.length > 1) return `Advisor: on (${stats.advisors.length} advisors)`;
-			if (stats.active && stats.model) return `Advisor: on (${stats.model.provider}/${stats.model.id})`;
-			if (stats.configured) return "Advisor: configured, no model";
-			return "Advisor: off";
+			if (stats.active && stats.advisors.length > 1)
+				return tf("Advisor: on ({0} advisors)", String(stats.advisors.length));
+			if (stats.active && stats.model) return tf("Advisor: on ({0})", `${stats.model.provider}/${stats.model.id}`);
+			if (stats.configured) return t("Advisor: configured, no model");
+			return t("Advisor: off");
 		},
 		handle: async (command, runtime) => {
 			const { verb, rest } = parseSubcommand(command.args);
@@ -262,11 +264,14 @@ export const BUILTIN_COLLABORATION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpe
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
 			if (runtime.ctx.collabHost) {
-				return `Collab: hosting (${Math.max(0, runtime.ctx.collabHost.participants.length - 1)} guests)`;
+				return tf(
+					"Collab: hosting ({0} guests)",
+					String(Math.max(0, runtime.ctx.collabHost.participants.length - 1)),
+				);
 			}
-			if (runtime.ctx.collabGuest?.readOnly) return "Collab: read-only guest";
-			if (runtime.ctx.collabGuest) return "Collab: guest";
-			return "Collab: off";
+			if (runtime.ctx.collabGuest?.readOnly) return t("Collab: read-only guest");
+			if (runtime.ctx.collabGuest) return t("Collab: guest");
+			return t("Collab: off");
 		},
 		handleTui: async (command, runtime) => {
 			const ctx = runtime.ctx;
@@ -368,9 +373,9 @@ export const BUILTIN_COLLABORATION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpe
 		name: "leave",
 		description: "Leave the collab session",
 		getTuiAutocompleteDescription: runtime => {
-			if (runtime.ctx.collabHost) return "Leave collab: hosting";
-			if (runtime.ctx.collabGuest) return "Leave collab: guest";
-			return "Leave collab: not in collab";
+			if (runtime.ctx.collabHost) return t("Leave collab: hosting");
+			if (runtime.ctx.collabGuest) return t("Leave collab: guest");
+			return t("Leave collab: not in collab");
 		},
 		handleTui: async (_command, runtime) => {
 			const ctx = runtime.ctx;
@@ -397,8 +402,10 @@ export const BUILTIN_COLLABORATION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpe
 		],
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
-			if (!runtime.ctx.settings.get("browser.enabled" as SettingPath)) return "Browser: disabled";
-			return runtime.ctx.settings.get("browser.headless" as SettingPath) ? "Browser: headless" : "Browser: visible";
+			if (!runtime.ctx.settings.get("browser.enabled" as SettingPath)) return t("Browser: disabled");
+			return runtime.ctx.settings.get("browser.headless" as SettingPath)
+				? t("Browser: headless")
+				: t("Browser: visible");
 		},
 		handle: async (command, runtime) => {
 			const arg = command.args.toLowerCase();
