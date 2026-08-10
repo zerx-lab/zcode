@@ -20,6 +20,7 @@ import type {
 	SubagentLifecyclePayload,
 	SubagentProgressPayload,
 } from "@oh-my-pi/pi-wire";
+import { t, tf } from "../i18n";
 import { importRoomKey } from "./codec";
 import { COLLAB_PROTO, encodeBase64Url, parseCollabLink } from "./link";
 import { CollabSocket } from "./socket";
@@ -130,7 +131,7 @@ export class GuestClient {
 		this.#socket.onOpen = () => this.#handleOpen();
 		this.#socket.onFrame = frame => this.#applyFrameSafe(frame);
 		this.#socket.onControl = msg => {
-			if (msg.t === "room-closed") this.#end("room closed");
+			if (msg.t === "room-closed") this.#end(t("room closed"));
 		};
 		this.#socket.onClose = (reason, willReconnect) => this.#handleClose(reason, willReconnect);
 		this.#snapshot = this.#buildSnapshot();
@@ -146,7 +147,7 @@ export class GuestClient {
 		if (!this.#welcomed && this.#welcomeTimer === null) {
 			this.#welcomeTimer = setTimeout(() => {
 				this.#welcomeTimer = null;
-				if (!this.#welcomed) this.#end("timed out waiting for the host's welcome");
+				if (!this.#welcomed) this.#end(t("timed out waiting for the host's welcome"));
 			}, WELCOME_TIMEOUT_MS);
 		}
 	}
@@ -256,7 +257,7 @@ export class GuestClient {
 		this.#clearSnapshotProgressTimer();
 		this.#snapshotProgressTimer = setTimeout(() => {
 			this.#snapshotProgressTimer = null;
-			this.#end("timed out waiting for the host's session snapshot");
+			this.#end(t("timed out waiting for the host's session snapshot"));
 		}, SNAPSHOT_PROGRESS_TIMEOUT_MS);
 	}
 
@@ -274,10 +275,10 @@ export class GuestClient {
 		} catch (err) {
 			console.warn("collab: failed to apply frame", frame.t, err);
 			if (frame.t === "welcome" && !this.#welcomed) {
-				this.#end(`failed to apply session snapshot: ${err instanceof Error ? err.message : String(err)}`);
+				this.#end(tf("failed to apply session snapshot: {0}", err instanceof Error ? err.message : String(err)));
 				return;
 			}
-			this.#pushNotice("error", `failed to apply ${frame.t} frame`);
+			this.#pushNotice("error", tf("failed to apply {0} frame", frame.t));
 			this.#commit();
 		}
 	}
@@ -459,23 +460,23 @@ export class GuestClient {
 				this.#pushNotice(event.level, event.message);
 				break;
 			case "auto_retry_start":
-				this.#pushNotice("info", `retry ${event.attempt}/${event.maxAttempts}: ${event.errorMessage}`);
+				this.#pushNotice("info", tf("retry {0}/{1}: {2}", event.attempt, event.maxAttempts, event.errorMessage));
 				break;
 			case "auto_retry_end":
-				if (!event.success) this.#pushNotice("error", event.finalError ?? "retry failed");
+				if (!event.success) this.#pushNotice("error", event.finalError ?? t("retry failed"));
 				break;
 			case "auto_compaction_start":
-				this.#pushNotice("info", `compacting context (${event.reason})`);
+				this.#pushNotice("info", tf("compacting context ({0})", event.reason));
 				break;
 			case "auto_compaction_end":
 				if (!event.skipped) {
 					this.#pushNotice(
 						"info",
 						event.aborted
-							? "compaction aborted"
+							? t("compaction aborted")
 							: event.errorMessage
-								? `compaction failed: ${event.errorMessage}`
-								: "context compacted",
+								? tf("compaction failed: {0}", event.errorMessage)
+								: t("context compacted"),
 					);
 				}
 				break;

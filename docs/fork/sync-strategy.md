@@ -55,9 +55,20 @@ bash brand/sync.sh
 3. `git checkout zcode && git rebase upstream/main` —— 唯一冲突点，rerere 自动重放已知解法（`rerere.enabled` + `rerere.autoUpdate` 已配置）
 4. `git branch -f release zcode && git checkout release && bun brand/apply.ts`，产物 commit（空则跳过）
 5. 门禁：`bun brand/verify.ts` + `bun check`
-6. **全绿后**才 `git update-ref refs/brand/last-sync upstream/main`
+6. **全绿后**才 `git update-ref refs/brand/last-sync upstream/main`，并把 `.git/rr-cache` 快照发布到 `origin` 的 `refs/brand/rr-cache`（供 CI 重放）
 
-节奏：**每周一次**，不要每天。一周 ~950 commits 批量解一次，rerere 命中率高；每天同步只是把同样的冲突拆成七份。
+### 自动同步（GitHub Actions）
+
+`.github/workflows/sync-upstream.yml`（zcode 上的 fork 新文件）每天 UTC 22:00 无人值守执行：fetch upstream → 从 `refs/brand/rr-cache` 种入 rerere 解法 → rebase `zcode`（带进度守卫：`REBASE_HEAD` 不前进即 abort，防非冲突失败被吞或无限重试）→ `bun run check:ts` 门禁 → `--force-with-lease=zcode` 只推 `zcode`；镜像分支 `main` 的快进是独立的 best-effort 步骤（`continue-on-error`），失败不阻断也不参与失败语义——**run 红 = `zcode` 没动，需人工**。前提：fork 默认分支须为 `zcode`（`schedule` 只读默认分支上的 workflow）。
+
+冲突分工：
+
+- **rerere 见过的冲突** → CI 自动重放、推送，无需人工。
+- **新冲突** → CI `rebase --abort`、run 失败并邮件通知，绝不推半解决状态。人工本地跑 `bash brand/sync.sh` 解一次，脚本全绿后自动发布 `rr-cache` 快照，**同一冲突只需人工解一次**。
+
+注意本地推送互动：CI 用 `--force-with-lease`，不会覆盖你刚推的新提交；反过来 CI 每天可能重写 `zcode` 历史，**本地开工前先 `git fetch origin && git rebase origin/zcode`**（或确认无分叉）。
+
+节奏：CI 每天消化干净/可重放的部分；人工完整流程（漂移审查、overlay、`bun check` 全量、基线推进）在 CI 失败或每周例行时执行。
 
 ## 品牌补丁构成（待实施清单）
 

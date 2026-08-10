@@ -1,4 +1,5 @@
 import { type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
+import { useI18n } from "../../i18n";
 import { type ThemePreference, useThemePreference } from "../../lib/theme";
 
 const NEXT_PREFERENCE: Record<ThemePreference, ThemePreference> = {
@@ -20,16 +21,18 @@ const PREFERENCE_LABEL: Record<ThemePreference, string> = {
 };
 
 export function ThemeToggle() {
+	const { t, tf } = useI18n();
 	const { preference, setPreference } = useThemePreference();
 	const Icon = PREFERENCE_ICON[preference];
+	const hint = tf("{0} — click to switch", t(PREFERENCE_LABEL[preference]));
 
 	return (
 		<button
 			type="button"
 			className="sh-theme-toggle"
 			onClick={() => setPreference(NEXT_PREFERENCE[preference])}
-			aria-label={`${PREFERENCE_LABEL[preference]} (click to switch)`}
-			title={`${PREFERENCE_LABEL[preference]} — click to switch`}
+			aria-label={hint}
+			title={hint}
 		>
 			<Icon size={16} />
 		</button>

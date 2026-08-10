@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { Fragment, useCallback, useRef, useState } from "react";
 import { AppLayout } from "./app/AppLayout";
 import type { DashboardSection } from "./app/routes";
 import { useHashRoute } from "./data/useHashRoute";
+import { useLocale } from "./i18n";
 import {
 	BehaviorRoute,
 	CostsRoute,
@@ -21,6 +22,9 @@ export default function App() {
 	const [refreshTrigger, setRefreshTrigger] = useState(0);
 	const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
 	const [updatedAt, setUpdatedAt] = useState<number | null>(() => Date.now());
+	// 语言切换 → 根 Fragment 换 key 整树重挂，所有渲染点的 t() 重新求值。
+	// App 自身状态（hash 路由、refreshTrigger）不受影响。
+	const locale = useLocale();
 
 	const handleSyncComplete = useCallback((result: { success: boolean }) => {
 		if (result.success) {
@@ -90,7 +94,7 @@ export default function App() {
 	};
 
 	return (
-		<>
+		<Fragment key={locale}>
 			<AppLayout
 				activeSection={active}
 				onSectionChange={setSection}
@@ -107,6 +111,6 @@ export default function App() {
 			</AppLayout>
 
 			<RequestDrawer id={selectedRequestId} onClose={closeDrawer} />
-		</>
+		</Fragment>
 	);
 }

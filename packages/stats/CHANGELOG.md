@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- Simplified Chinese dashboard locale with TopBar language toggle and English-key zh-CN dictionaries
+
+### Changed
+- Rebranded stats UI to zcode blue theme and `BRAND_DISPLAY_NAME` wordmark; chart series palette kept multi-hue
 ## [17.2.10] - 2026-08-06
 
 ### Changed

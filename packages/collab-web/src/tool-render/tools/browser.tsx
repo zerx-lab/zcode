@@ -1,5 +1,6 @@
 /** `browser` — drive a Chromium tab: open/close named tabs, run puppeteer scripts. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badge, CodeBlock, ResultImages, ResultText, type Tone } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, isRecord, num, shortenPath, str, truncate } from "../util";
@@ -46,13 +47,18 @@ function actionTone(action: string): Tone | undefined {
 }
 
 /** Mirrors the TUI's `describeBrowser`: explicit app args win over reported mode. */
-function describeBrowser(app: AppArg | null, details: BrowserDetails): string | null {
-	if (app?.cdpUrl) return `connected ${app.cdpUrl}`;
-	if (app?.path) return `spawned ${shortenPath(app.path)}`;
+function describeBrowser(
+	app: AppArg | null,
+	details: BrowserDetails,
+	tf: (en: string, ...args: readonly (string | number)[]) => string,
+): string | null {
+	if (app?.cdpUrl) return tf("connected {0}", app.cdpUrl);
+	if (app?.path) return tf("spawned {0}", shortenPath(app.path));
 	return details.browser;
 }
 
 function Summary({ args, result }: ToolRenderProps): ReactNode {
+	const { t } = useI18n();
 	const details = detailsOf(result);
 	const action = str(args.action) ?? details.action ?? "?";
 	const closeAll = action === "close" && (args.all === true || (str(args.name) === null && details.name === null));
@@ -61,7 +67,7 @@ function Summary({ args, result }: ToolRenderProps): ReactNode {
 	return (
 		<>
 			<Badge tone={actionTone(action)}>{action}</Badge>
-			<span>{closeAll ? "all tabs" : tab}</span>
+			<span>{closeAll ? t("all tabs") : tab}</span>
 			{args.kill === true && <Badge tone="err">kill</Badge>}
 			{url && <span className="tv-faint">{truncate(shortenPath(url), 72)}</span>}
 		</>
@@ -69,12 +75,13 @@ function Summary({ args, result }: ToolRenderProps): ReactNode {
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { tf } = useI18n();
 	const details = detailsOf(result);
 	const action = str(args.action) ?? details.action;
 	const app = appOf(args);
 	const tab = details.name ?? str(args.name);
 	const url = details.url ?? str(args.url);
-	const browserDesc = describeBrowser(app, details);
+	const browserDesc = describeBrowser(app, details, tf);
 	const viewport = isRecord(args.viewport) ? args.viewport : null;
 	const vpWidth = viewport ? num(viewport.width) : null;
 	const vpHeight = viewport ? num(viewport.height) : null;
@@ -83,7 +90,7 @@ function Body({ args, result }: ToolRenderProps): ReactNode {
 	return (
 		<>
 			<span className="tv-badges">
-				{tab !== null && <Badge>tab {tab}</Badge>}
+				{tab !== null && <Badge>{tf("tab {0}", tab)}</Badge>}
 				{url && <Badge tone="accent">{truncate(shortenPath(url), 120)}</Badge>}
 				{browserDesc && <Badge>{browserDesc}</Badge>}
 				{app?.target && <Badge>target {app.target}</Badge>}

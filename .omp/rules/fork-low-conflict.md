@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Fork 低冲突开发规约
 
-本仓库是 can1357/oh-my-pi 的二次开发 fork（补丁栈分支 `zcode`，上游 ~138 commits/天，每周 `bash brand/sync.sh` rebase 同步）。**每一行对上游文件的修改都是永久的 rebase 冲突面。**
+本仓库是 can1357/oh-my-pi 的二次开发 fork（补丁栈分支 `zcode`，上游 ~138 commits/天）。同步双轨：CI（`.github/workflows/sync-upstream.yml`）每天自动 rebase `zcode` 并强推（rerere 解法经 `refs/brand/rr-cache` 从本地发布给 CI）；CI 失败或每周例行时人工 `bash brand/sync.sh`。**每一行对上游文件的修改都是永久的 rebase 冲突面**，且 CI 每天可能重写 `zcode` 历史——本地开工前先 `git fetch origin && git rebase origin/zcode`。
 
 这条规约不限制你能改什么。它的作用是让每次动手都带着一个问题：**这行改动下周要不要我再解一次冲突？** 完整策略见 `docs/fork/sync-strategy.md`。
 

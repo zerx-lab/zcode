@@ -2,6 +2,7 @@ import type { AssistantMessage, ImageContent, SessionEntry, TextContent, ToolRes
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "../../i18n";
 import type { ActiveTool } from "../../lib/client";
 import { fmtTokens } from "../../lib/format";
 import type { ToolRenderHost } from "../../tool-render";
@@ -42,20 +43,23 @@ function Row({
 }
 
 function ThinkingBlock({ text, redacted }: { text: string; redacted?: boolean }): ReactNode {
+	const { t } = useI18n();
 	const [open, setOpen] = useState(false);
 	return (
 		<div className="tr-think">
 			<button type="button" className="tr-think-head" onClick={() => setOpen(v => !v)}>
 				<ChevronRight size={11} className={`tr-chev${open ? " tr-chev--open" : ""}`} />
-				thinking{redacted ? " · redacted" : ""}
+				{t("thinking")}
+				{redacted ? ` · ${t("redacted")}` : ""}
 			</button>
-			{open && <div className="tr-think-body">{redacted ? "(redacted by provider)" : text}</div>}
+			{open && <div className="tr-think-body">{redacted ? t("(redacted by provider)") : text}</div>}
 		</div>
 	);
 }
 
 /** Markdown + image thumbnails for user / custom message content. */
 function MsgContent({ content }: { content: string | readonly (TextContent | ImageContent)[] }): ReactNode {
+	const { t } = useI18n();
 	if (typeof content === "string") return <Markdown text={content} />;
 	return (
 		<>
@@ -69,7 +73,7 @@ function MsgContent({ content }: { content: string | readonly (TextContent | Ima
 								key={i}
 								className="tr-msg-img"
 								src={`data:${block.mimeType};base64,${block.data}`}
-								alt="attachment"
+								alt={t("attachment")}
 							/>
 						);
 					default:
@@ -94,6 +98,7 @@ function AssistantBody({
 	pending: boolean;
 	host?: ToolRenderHost;
 }): ReactNode {
+	const { t } = useI18n();
 	const blocks = message.content.map((block, i) => {
 		switch (block.type) {
 			case "thinking":
@@ -131,7 +136,7 @@ function AssistantBody({
 			{blocks}
 			{failed && (
 				<div className="tr-stop">
-					<span className={`tr-chip ${stop === "error" ? "tr-chip--err" : "tr-chip--warn"}`}>{stop}</span>
+					<span className={`tr-chip ${stop === "error" ? "tr-chip--err" : "tr-chip--warn"}`}>{t(stop)}</span>
 					{message.errorMessage !== undefined && message.errorMessage.length > 0 && (
 						<span className="tr-stop-msg">{message.errorMessage}</span>
 					)}
@@ -162,19 +167,20 @@ function entryRowEqual(prev: EntryRowProps, next: EntryRowProps): boolean {
 }
 
 const EntryRow = memo(function EntryRow({ entry, results, active, host }: EntryRowProps): ReactNode {
+	const { t, tf } = useI18n();
 	switch (entry.type) {
 		case "message": {
 			const msg = entry.message;
 			switch (msg.role) {
 				case "user":
 					return (
-						<Row kind="user" gutter="host" title={entry.timestamp}>
+						<Row kind="user" gutter={t("host")} title={entry.timestamp}>
 							<MsgContent content={msg.content} />
 						</Row>
 					);
 				case "assistant":
 					return (
-						<Row kind="assistant" gutter="agent" title={entry.timestamp}>
+						<Row kind="assistant" gutter={t("agent")} title={entry.timestamp}>
 							<AssistantBody message={msg} results={results} active={active} pending={false} host={host} />
 						</Row>
 					);
@@ -211,25 +217,25 @@ const EntryRow = memo(function EntryRow({ entry, results, active, host }: EntryR
 		case "compaction":
 			return (
 				<div className="tr-divider" title={entry.shortSummary ?? entry.summary}>
-					<span>context compacted · {fmtTokens(entry.tokensBefore)} tokens</span>
+					<span>{tf("context compacted · {0} tokens", fmtTokens(entry.tokensBefore))}</span>
 				</div>
 			);
 		case "branch_summary":
 			return (
 				<div className="tr-divider" title={entry.summary}>
-					<span>branch summary</span>
+					<span>{t("branch summary")}</span>
 				</div>
 			);
 		case "model_change":
 			return (
 				<Row kind="marker" gutter="" title={entry.timestamp}>
-					<span className="tr-marker">model → {entry.model}</span>
+					<span className="tr-marker">{tf("model → {0}", entry.model)}</span>
 				</Row>
 			);
 		case "thinking_level_change":
 			return (
 				<Row kind="marker" gutter="" title={entry.timestamp}>
-					<span className="tr-marker">thinking → {entry.thinkingLevel ?? "off"}</span>
+					<span className="tr-marker">{tf("thinking → {0}", entry.thinkingLevel ?? t("off"))}</span>
 				</Row>
 			);
 		default:
@@ -239,6 +245,7 @@ const EntryRow = memo(function EntryRow({ entry, results, active, host }: EntryR
 }, entryRowEqual);
 
 export function Transcript(props: TranscriptProps): ReactNode {
+	const { t } = useI18n();
 	const { entries, stream, streamDone, activeTools, working, compact, host } = props;
 
 	const results = useMemo(() => {
@@ -289,12 +296,12 @@ export function Transcript(props: TranscriptProps): ReactNode {
 				}
 			}}
 		>
-			{entries.length === 0 && stream === null && !working && <div className="tr-empty">no activity yet</div>}
+			{entries.length === 0 && stream === null && !working && <div className="tr-empty">{t("no activity yet")}</div>}
 			{entries.map(entry => (
 				<EntryRow key={entry.id} entry={entry} results={results} active={activeTools} host={host} />
 			))}
 			{stream !== null && (
-				<Row kind="assistant" gutter="agent">
+				<Row kind="assistant" gutter={t("agent")}>
 					<AssistantBody
 						message={stream}
 						results={results}
@@ -305,7 +312,7 @@ export function Transcript(props: TranscriptProps): ReactNode {
 				</Row>
 			)}
 			{tailTools.length > 0 && (
-				<Row kind="assistant" gutter={stream === null ? "agent" : ""}>
+				<Row kind="assistant" gutter={stream === null ? t("agent") : ""}>
 					{tailTools.map(tool => (
 						<ToolCard
 							key={tool.toolCallId}
@@ -321,8 +328,8 @@ export function Transcript(props: TranscriptProps): ReactNode {
 				</Row>
 			)}
 			{working && stream === null && activeTools.size === 0 && (
-				<Row kind="assistant" gutter="agent">
-					<div className="tr-shimmer">thinking…</div>
+				<Row kind="assistant" gutter={t("agent")}>
+					<div className="tr-shimmer">{t("thinking…")}</div>
 				</Row>
 			)}
 		</div>

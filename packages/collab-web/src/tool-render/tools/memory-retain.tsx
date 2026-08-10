@@ -1,5 +1,6 @@
 /** `retain` — store facts in long-term memory (one bullet per stored item). */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badge, InvalidArg, ResultText, Row } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, isRecord, normalizeWs, num, replaceTabs, resultTextOf, str, truncate } from "../util";
@@ -25,19 +26,21 @@ function retainItems(args: Record<string, unknown>): RetainItem[] | null {
 }
 
 function Summary({ args, result }: ToolRenderProps): ReactNode {
+	const { tf } = useI18n();
 	const items = retainItems(args);
 	if (items === null) return <InvalidArg what="items" />;
 	const count = num(detailsRecord(result)?.count) ?? items.length;
 	const first = items[0] ? truncate(normalizeWs(items[0].content), 80) : "";
 	return (
 		<>
-			<Badge tone="accent">{count === 1 ? "1 memory" : `${count} memories`}</Badge>
+			<Badge tone="accent">{tf("{0} memories", count)}</Badge>
 			{first && <span className="tv-trunc">{first}</span>}
 		</>
 	);
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { tf } = useI18n();
 	const items = retainItems(args);
 	const count = num(detailsRecord(result)?.count);
 	// The tool's own "N memories stored/queued." line; trailing period dropped
@@ -45,7 +48,7 @@ function Body({ args, result }: ToolRenderProps): ReactNode {
 	let confirmation: string | null = null;
 	if (result && result.isError !== true) {
 		const text = resultTextOf(result).trim().replace(/\.$/, "");
-		confirmation = text || (count !== null ? `${count === 1 ? "1 memory" : `${count} memories`} retained` : null);
+		confirmation = text || (count !== null ? tf("{0} memories retained", count) : null);
 	}
 	return (
 		<>

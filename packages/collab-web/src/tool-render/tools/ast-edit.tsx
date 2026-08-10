@@ -1,5 +1,6 @@
 /** `ast_edit` — structural AST rewrites: per-op pattern/replacement pairs, replacement counts, diffs. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badge, CodeBlock, DiffBlock, InvalidArg, Note, Output, PathText, ResultText, Row } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, isRecord, languageFromPath, num, shortenPath, str } from "../util";
@@ -73,6 +74,7 @@ function detailsOf(result: ToolRenderProps["result"]): AstEditDetails | null {
 }
 
 function Summary({ args, result }: ToolRenderProps): ReactNode {
+	const { t, tf } = useI18n();
 	const paths = pathsOf(args);
 	const first = paths[0];
 	const opCount = Array.isArray(args.ops) ? args.ops.length : 0;
@@ -81,38 +83,34 @@ function Summary({ args, result }: ToolRenderProps): ReactNode {
 	return (
 		<>
 			{first ? <PathText path={first} /> : <InvalidArg what="paths" />}
-			{paths.length > 1 && <span className="tv-faint">+{paths.length - 1} more</span>}
-			<Badge tone="accent">
-				{opCount} op{opCount === 1 ? "" : "s"}
-			</Badge>
-			{total != null && (
-				<Badge tone={total > 0 ? "ok" : "warn"}>
-					{total} replacement{total === 1 ? "" : "s"}
-				</Badge>
-			)}
-			{details?.limitReached && <Badge tone="warn">limit</Badge>}
+			{paths.length > 1 && <span className="tv-faint">{tf("+{0} more", paths.length - 1)}</span>}
+			<Badge tone="accent">{tf("{0} ops", opCount)}</Badge>
+			{total != null && <Badge tone={total > 0 ? "ok" : "warn"}>{tf("{0} replacements", total)}</Badge>}
+			{details?.limitReached && <Badge tone="warn">{t("limit")}</Badge>}
 		</>
 	);
 }
 
 function OpCell({ op, lang }: { op: AstEditOp; lang: string | null }): ReactNode {
+	const { t } = useI18n();
 	return (
 		<div className="tv-cell">
 			{op.pat ? (
-				<CodeBlock code={op.pat} lang={lang} title="pattern" maxLines={10} />
+				<CodeBlock code={op.pat} lang={lang} title={t("pattern")} maxLines={10} />
 			) : (
 				<InvalidArg what="pattern" />
 			)}
 			{op.out ? (
-				<CodeBlock code={op.out} lang={lang} title="replacement" maxLines={10} />
+				<CodeBlock code={op.out} lang={lang} title={t("replacement")} maxLines={10} />
 			) : (
-				<div className="tv-muted">deletion — matched code is removed</div>
+				<div className="tv-muted">{t("deletion — matched code is removed")}</div>
 			)}
 		</div>
 	);
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { t, tf } = useI18n();
 	const paths = pathsOf(args);
 	const first = paths[0];
 	const ops = opsOf(args);
@@ -141,17 +139,13 @@ function Body({ args, result }: ToolRenderProps): ReactNode {
 				<span className="tv-badges">
 					{details.totalReplacements != null && (
 						<Badge tone={details.totalReplacements > 0 ? "ok" : "warn"}>
-							{details.totalReplacements} replacement{details.totalReplacements === 1 ? "" : "s"}
+							{tf("{0} replacements", details.totalReplacements)}
 						</Badge>
 					)}
-					{details.filesTouched != null && (
-						<Badge>
-							{details.filesTouched} file{details.filesTouched === 1 ? "" : "s"}
-						</Badge>
-					)}
-					{details.filesSearched != null && <Badge>searched {details.filesSearched}</Badge>}
-					{details.scopePath && <Badge>in {shortenPath(details.scopePath)}</Badge>}
-					{details.limitReached && <Badge tone="warn">limit reached</Badge>}
+					{details.filesTouched != null && <Badge>{tf("{0} files", details.filesTouched)}</Badge>}
+					{details.filesSearched != null && <Badge>{tf("searched {0}", details.filesSearched)}</Badge>}
+					{details.scopePath && <Badge>{tf("in {0}", shortenPath(details.scopePath))}</Badge>}
+					{details.limitReached && <Badge tone="warn">{t("limit reached")}</Badge>}
 				</span>
 			)}
 			{details && details.fileReplacements.length > 0 && (
@@ -163,12 +157,12 @@ function Body({ args, result }: ToolRenderProps): ReactNode {
 					))}
 				</div>
 			)}
-			{details?.limitReached && <Note tone="warn">limit reached; narrow path</Note>}
+			{details?.limitReached && <Note tone="warn">{t("limit reached; narrow path")}</Note>}
 			{details && details.parseErrors.length > 0 && (
 				<Output
 					text={details.parseErrors.join("\n")}
 					maxLines={6}
-					title={`parse issues (${parseErrorsTotal})`}
+					title={tf("parse issues ({0})", parseErrorsTotal)}
 					variant="plain"
 				/>
 			)}

@@ -2,6 +2,7 @@ import type { AgentSnapshot, SessionEntry, SubagentProgressPayload } from "@oh-m
 import { OctagonX, RotateCcw, SendHorizontal, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { useI18n } from "../../i18n";
 import type { GuestClient } from "../../lib/client";
 import { fmtCost, fmtDuration, fmtTokens } from "../../lib/format";
 import { decideTranscriptPoll } from "../../lib/transcript-poll";
@@ -21,6 +22,7 @@ export function AgentDrawer(props: {
 	host?: TranscriptProps["host"];
 	onClose(): void;
 }): ReactNode {
+	const { t, tf } = useI18n();
 	const { agent, progress, client, readOnly, host, onClose } = props;
 	const [entries, setEntries] = useState<readonly SessionEntry[]>([]);
 	const [fetchError, setFetchError] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export function AgentDrawer(props: {
 			<header className="ag-drawer-head">
 				<div className="ag-drawer-title">
 					<span className="ag-drawer-name">{agent.displayName}</span>
-					<span className={`ag-chip ag-chip--${agent.status}`}>{agent.status}</span>
+					<span className={`ag-chip ag-chip--${agent.status}`}>{t(agent.status)}</span>
 					{model ? <span className="ag-chip ag-chip--model">{model}</span> : null}
 				</div>
 				<div className="ag-drawer-actions">
@@ -122,16 +124,16 @@ export function AgentDrawer(props: {
 							onClick={() => client.sendAgentCmd("kill", agent.id)}
 						>
 							<OctagonX size={13} aria-hidden />
-							kill
+							{t("kill")}
 						</button>
 					) : null}
 					{(agent.status === "parked" || agent.status === "aborted") && !readOnly ? (
 						<button type="button" className="ag-btn" onClick={() => client.sendAgentCmd("revive", agent.id)}>
 							<RotateCcw size={13} aria-hidden />
-							revive
+							{t("revive")}
 						</button>
 					) : null}
-					<button type="button" className="ag-iconbtn" aria-label="close" onClick={onClose}>
+					<button type="button" className="ag-iconbtn" aria-label={t("close")} onClick={onClose}>
 						<X size={15} aria-hidden />
 					</button>
 				</div>
@@ -143,7 +145,7 @@ export function AgentDrawer(props: {
 						<span className="ag-stat-value">{fmtTokens(p.tokens)}</span>
 					</span>
 					{ctxPct !== null ? (
-						<span className="ag-stat" title={`context ${fmtTokens(p.contextTokens ?? 0)}`}>
+						<span className="ag-stat" title={tf("context {0}", fmtTokens(p.contextTokens ?? 0))}>
 							<span className="ag-stat-label">ctx</span>
 							<span className="ag-gauge">
 								<span
@@ -154,11 +156,11 @@ export function AgentDrawer(props: {
 						</span>
 					) : null}
 					<span className="ag-stat">
-						<span className="ag-stat-label">cost</span>
+						<span className="ag-stat-label">{t("cost")}</span>
 						<span className="ag-stat-value">{fmtCost(p.cost)}</span>
 					</span>
 					<span className="ag-stat">
-						<span className="ag-stat-label">tools</span>
+						<span className="ag-stat-label">{t("tools")}</span>
 						<span className="ag-stat-value">{p.toolCount}</span>
 					</span>
 					<span className="ag-stat">
@@ -180,12 +182,12 @@ export function AgentDrawer(props: {
 						/>
 						{fetchError !== null ? (
 							<div className="ag-fetch-error" role="alert">
-								transcript unavailable: {fetchError}
+								{tf("transcript unavailable: {0}", fetchError)}
 							</div>
 						) : null}
 					</>
 				) : (
-					<div className="ag-empty">no transcript available</div>
+					<div className="ag-empty">{t("no transcript available")}</div>
 				)}
 			</div>
 			{!readOnly && (
@@ -199,10 +201,10 @@ export function AgentDrawer(props: {
 					<input
 						className="ag-chat-input"
 						value={draft}
-						placeholder={`message ${agent.displayName}…`}
+						placeholder={tf("message {0}…", agent.displayName)}
 						onChange={e => setDraft(e.target.value)}
 					/>
-					<button type="submit" className="ag-iconbtn" aria-label="send" disabled={draft.trim().length === 0}>
+					<button type="submit" className="ag-iconbtn" aria-label={t("send")} disabled={draft.trim().length === 0}>
 						<SendHorizontal size={15} aria-hidden />
 					</button>
 				</form>

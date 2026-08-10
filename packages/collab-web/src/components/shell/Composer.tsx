@@ -1,6 +1,7 @@
 import { SendHorizontal, Square } from "lucide-react";
 import type { KeyboardEvent, ReactNode, RefObject } from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useI18n } from "../../i18n";
 import type { GuestClient, GuestSnapshot } from "../../lib/client";
 
 export interface ComposerProps {
@@ -65,6 +66,7 @@ interface AskEditorProps {
  * draft. Submits verbatim — whitespace-only responses are intentional.
  */
 function AskEditor({ prefill, onSubmit }: AskEditorProps): ReactNode {
+	const { t } = useI18n();
 	const [draft, setDraft] = useState(prefill ?? "");
 	const taRef = useRef<HTMLTextAreaElement | null>(null);
 	const { composingRef, onCompositionStart, onCompositionEnd } = useCompositionGuard();
@@ -90,7 +92,7 @@ function AskEditor({ prefill, onSubmit }: AskEditorProps): ReactNode {
 				onKeyDown={onKeyDown}
 				onCompositionStart={onCompositionStart}
 				onCompositionEnd={onCompositionEnd}
-				placeholder="type your response…"
+				placeholder={t("type your response…")}
 				rows={1}
 				spellCheck={false}
 			/>
@@ -99,9 +101,9 @@ function AskEditor({ prefill, onSubmit }: AskEditorProps): ReactNode {
 					type="button"
 					className="sh-btn sh-btn-primary"
 					onClick={() => onSubmit(draft)}
-					title="submit response"
+					title={t("submit response")}
 				>
-					<SendHorizontal size={12} /> <span className="sh-btn-label">Submit</span>
+					<SendHorizontal size={12} /> <span className="sh-btn-label">{t("Submit")}</span>
 				</button>
 			</div>
 		</div>
@@ -109,6 +111,7 @@ function AskEditor({ prefill, onSubmit }: AskEditorProps): ReactNode {
 }
 
 export function Composer({ client, snapshot }: ComposerProps): ReactNode {
+	const { t } = useI18n();
 	const [text, setText] = useState("");
 	const taRef = useRef<HTMLTextAreaElement | null>(null);
 	const { composingRef, onCompositionStart, onCompositionEnd } = useCompositionGuard();
@@ -177,7 +180,7 @@ export function Composer({ client, snapshot }: ComposerProps): ReactNode {
 				)}
 				<div className="sh-composer-actions sh-ask-actions">
 					<button type="button" className="sh-btn" onClick={() => client.sendUiResponse(uiRequest.reqId)}>
-						Cancel
+						{t("Cancel")}
 					</button>
 					{busy && (
 						<button
@@ -185,9 +188,9 @@ export function Composer({ client, snapshot }: ComposerProps): ReactNode {
 							className="sh-btn sh-btn-stop"
 							onClick={() => client.sendAbort()}
 							disabled={!live}
-							title="stop the current turn"
+							title={t("stop the current turn")}
 						>
-							<Square size={11} /> <span className="sh-btn-label">Stop</span>
+							<Square size={11} /> <span className="sh-btn-label">{t("Stop")}</span>
 						</button>
 					)}
 				</div>
@@ -208,10 +211,10 @@ export function Composer({ client, snapshot }: ComposerProps): ReactNode {
 					onCompositionEnd={onCompositionEnd}
 					placeholder={
 						readOnly
-							? "read-only session — watching only"
+							? t("read-only session — watching only")
 							: live
-								? "prompt the host agent…"
-								: "waiting for session…"
+								? t("prompt the host agent…")
+								: t("waiting for session…")
 					}
 					disabled={!canPrompt}
 					rows={1}
@@ -220,7 +223,7 @@ export function Composer({ client, snapshot }: ComposerProps): ReactNode {
 				<div className="sh-composer-actions">
 					{busy && queued > 0 && (
 						<span className="sh-queued">
-							<span className="sh-queued-label">queued </span>×{queued}
+							<span className="sh-queued-label">{t("queued")} </span>×{queued}
 						</span>
 					)}
 					{busy && !readOnly && (
@@ -229,9 +232,9 @@ export function Composer({ client, snapshot }: ComposerProps): ReactNode {
 							className="sh-btn sh-btn-stop"
 							onClick={() => client.sendAbort()}
 							disabled={!live}
-							title="stop the current turn"
+							title={t("stop the current turn")}
 						>
-							<Square size={11} /> <span className="sh-btn-label">Stop</span>
+							<Square size={11} /> <span className="sh-btn-label">{t("Stop")}</span>
 						</button>
 					)}
 					<button
@@ -239,9 +242,9 @@ export function Composer({ client, snapshot }: ComposerProps): ReactNode {
 						className="sh-btn sh-btn-primary"
 						onClick={send}
 						disabled={!canSend}
-						title="send (Enter)"
+						title={t("send (Enter)")}
 					>
-						<SendHorizontal size={12} /> <span className="sh-btn-label">Send</span>
+						<SendHorizontal size={12} /> <span className="sh-btn-label">{t("Send")}</span>
 					</button>
 				</div>
 			</div>

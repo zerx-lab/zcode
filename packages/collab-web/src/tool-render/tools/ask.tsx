@@ -1,5 +1,6 @@
 /** `ask` — interactive questions posed to the user mid-run. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badge, InvalidArg, Note, ResultText, Row } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, isRecord, normalizeWs, num, str, truncate } from "../util";
@@ -163,13 +164,14 @@ function Summary({ args }: ToolRenderProps): ReactNode {
 }
 
 function QuestionBlock({ q, answer }: { q: AskQuestion; answer: AskAnswer | undefined }): ReactNode {
+	const { t } = useI18n();
 	const selected = new Set(answer?.selectedOptions);
 	return (
 		<div className="tv-list">
 			<Row>
 				{q.id !== "?" && <span className="tv-faint">[{q.id}] </span>}
 				{q.question ? <span>{q.question}</span> : <InvalidArg what="question" />}
-				{q.multi && <Badge>multi</Badge>}
+				{q.multi && <Badge>{t("multi")}</Badge>}
 			</Row>
 			{q.options.map((opt, i) => {
 				const isSelected = selected.has(stripRecommended(opt.label));
@@ -177,7 +179,7 @@ function QuestionBlock({ q, answer }: { q: AskQuestion; answer: AskAnswer | unde
 				return (
 					<Row key={i} k={<span className={isSelected ? "tv-ok-text" : undefined}>{marker}</span>}>
 						<span className={answer && !isSelected ? "tv-muted" : undefined}>{opt.label}</span>
-						{i === q.recommended && <Badge tone="accent">recommended</Badge>}
+						{i === q.recommended && <Badge tone="accent">{t("recommended")}</Badge>}
 						{opt.description && <span className="tv-muted"> — {opt.description}</span>}
 					</Row>
 				);
@@ -189,10 +191,10 @@ function QuestionBlock({ q, answer }: { q: AskQuestion; answer: AskAnswer | unde
 			)}
 			{answer && answer.selectedOptions.length === 0 && answer.customInput === undefined && (
 				<Row k="—">
-					<span className="tv-warn-text">no selection</span>
+					<span className="tv-warn-text">{t("no selection")}</span>
 				</Row>
 			)}
-			{answer?.timedOut && <Note tone="warn">auto-selected after timeout — not a user choice</Note>}
+			{answer?.timedOut && <Note tone="warn">{t("auto-selected after timeout — not a user choice")}</Note>}
 		</div>
 	);
 }

@@ -3,6 +3,7 @@
  * back as plain result text (details are always empty).
  */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Note, Output, ResultText } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { normalizeWs, resultTextOf, str, truncate } from "../util";
@@ -13,14 +14,15 @@ function Summary({ args }: ToolRenderProps): ReactNode {
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { t } = useI18n();
 	const query = str(args.query) ?? "";
 	const context = str(args.context) ?? "";
 	const failedSilently = result?.isError === true && !resultTextOf(result);
 	return (
 		<>
-			{query && <Output text={query} title="query" maxLines={4} />}
-			{context && <Output text={context} title="context" maxLines={6} />}
-			{failedSilently ? <Note tone="err">Reflect failed</Note> : <ResultText result={result} maxLines={12} />}
+			{query && <Output text={query} title={t("query")} maxLines={4} />}
+			{context && <Output text={context} title={t("context")} maxLines={6} />}
+			{failedSilently ? <Note tone="err">{t("Reflect failed")}</Note> : <ResultText result={result} maxLines={12} />}
 		</>
 	);
 }

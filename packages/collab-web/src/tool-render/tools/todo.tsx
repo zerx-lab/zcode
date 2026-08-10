@@ -1,5 +1,6 @@
 /** `todo` — phased task-list ops and the resulting board. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badges, ResultText, Row } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, isRecord, normalizeWs, str, truncate } from "../util";
@@ -84,7 +85,11 @@ function Summary({ args }: ToolRenderProps): ReactNode {
 }
 
 /** One arg op as a labeled row: op name + the task/phase/list it touches. */
-function opRow(entry: unknown, key: number): ReactNode {
+function opRow(
+	entry: unknown,
+	key: number,
+	tf: (en: string, ...args: readonly (string | number)[]) => string,
+): ReactNode {
 	if (!isRecord(entry)) return null;
 	const parts: string[] = [];
 	const task = str(entry.task);
@@ -92,14 +97,14 @@ function opRow(entry: unknown, key: number): ReactNode {
 	if (task !== null) parts.push(task);
 	if (phase !== null) parts.push(phase);
 	if (Array.isArray(entry.items) && entry.items.length > 0) {
-		parts.push(`${entry.items.length} item${entry.items.length === 1 ? "" : "s"}`);
+		parts.push(tf("{0} items", entry.items.length));
 	}
 	if (Array.isArray(entry.list) && entry.list.length > 0) {
 		let tasks = 0;
 		for (const phaseEntry of entry.list) {
 			if (isRecord(phaseEntry) && Array.isArray(phaseEntry.items)) tasks += phaseEntry.items.length;
 		}
-		parts.push(`${entry.list.length} phase${entry.list.length === 1 ? "" : "s"} · ${tasks} tasks`);
+		parts.push(tf("{0} phases · {1} tasks", entry.list.length, tasks));
 	}
 	return (
 		<Row key={key} k={str(entry.op) ?? "update"}>
@@ -138,12 +143,13 @@ function Board({ phases }: { phases: unknown[] }): ReactNode {
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { tf } = useI18n();
 	const ops = toOps(args);
 	const rec = detailsRecord(result);
 	const phases = rec && Array.isArray(rec.phases) && !result?.isError ? rec.phases : null;
 	return (
 		<>
-			{ops.length > 0 && <div className="tv-list">{ops.map(opRow)}</div>}
+			{ops.length > 0 && <div className="tv-list">{ops.map((entry, key) => opRow(entry, key, tf))}</div>}
 			{phases !== null ? <Board phases={phases} /> : <ResultText result={result} maxLines={8} />}
 		</>
 	);

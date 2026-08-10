@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { useI18n } from "../../i18n";
 import type { Notice } from "../../lib/client";
 
 const INFO_TTL_MS = 4000;
@@ -8,6 +9,7 @@ const WARNING_TTL_MS = 8000;
 const MAX_VISIBLE = 4;
 
 export function Toasts({ notices }: { notices: readonly Notice[] }): ReactNode {
+	const { t } = useI18n();
 	// Dynamic membership keyed by notice id — runtime collection.
 	const [dismissed, setDismissed] = useState<Set<number>>(() => new Set());
 
@@ -53,7 +55,7 @@ export function Toasts({ notices }: { notices: readonly Notice[] }): ReactNode {
 				<div key={n.id} className={`sh-toast sh-toast-${n.level}`} role="status">
 					<span className="sh-toast-msg">{n.message}</span>
 					{n.level === "error" && (
-						<button type="button" className="sh-toast-close" onClick={() => close(n.id)} title="dismiss">
+						<button type="button" className="sh-toast-close" onClick={() => close(n.id)} title={t("dismiss")}>
 							<X size={12} />
 						</button>
 					)}

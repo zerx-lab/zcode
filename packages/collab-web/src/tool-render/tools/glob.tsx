@@ -1,5 +1,6 @@
 /** `glob` (legacy `find`) — glob-based file finder; results are paths sorted by mtime. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badge, Badges, InvalidArg, Note, ResultText } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, isRecord, num, scopePaths, shortenPath, str, truncate } from "../util";
@@ -12,6 +13,7 @@ function Summary({ args }: ToolRenderProps): ReactNode {
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { t, tf } = useI18n();
 	const details = detailsRecord(result);
 	const limit = num(args.limit);
 	const timeout = num(args.timeout);
@@ -35,22 +37,24 @@ function Body({ args, result }: ToolRenderProps): ReactNode {
 		<>
 			<Badges
 				items={[
-					limit !== null && <Badge>limit {limit}</Badge>,
+					limit !== null && <Badge>{tf("limit {0}", limit)}</Badge>,
 					args.gitignore === false && <Badge>no-gitignore</Badge>,
 					args.hidden === false && <Badge>no-hidden</Badge>,
-					timeout !== null && <Badge>timeout {timeout}s</Badge>,
-					fileCount !== null && (
-						<Badge tone="accent">
-							{fileCount} file{fileCount === 1 ? "" : "s"}
-						</Badge>
-					),
-					scopePath !== null && <Badge>in {shortenPath(scopePath)}</Badge>,
+					timeout !== null && <Badge>{tf("timeout {0}s", timeout)}</Badge>,
+					fileCount !== null && <Badge tone="accent">{tf("{0} files", fileCount)}</Badge>,
+					scopePath !== null && <Badge>{tf("in {0}", shortenPath(scopePath))}</Badge>,
 					truncated && (
-						<Badge tone="warn">{resultLimit !== null ? `truncated at ${resultLimit}` : "truncated"}</Badge>
+						<Badge tone="warn">
+							{resultLimit !== null ? tf("truncated at {0}", resultLimit) : t("truncated")}
+						</Badge>
 					),
 				]}
 			/>
-			{missing.length > 0 && <Note tone="warn">skipped missing: {missing.map(shortenPath).join(", ")}</Note>}
+			{missing.length > 0 && (
+				<Note tone="warn">
+					{t("skipped missing:")} {missing.map(shortenPath).join(", ")}
+				</Note>
+			)}
 			{error !== null && !result?.isError && <Note tone="err">{error}</Note>}
 			<ResultText result={result} maxLines={12} />
 		</>

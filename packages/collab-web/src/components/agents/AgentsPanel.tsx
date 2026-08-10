@@ -6,6 +6,7 @@ import type {
 } from "@oh-my-pi/pi-wire";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { useI18n } from "../../i18n";
 import { fmtCost, fmtDuration, fmtTokens, relTime } from "../../lib/format";
 import "./agents.css";
 
@@ -36,6 +37,7 @@ function activityLine(
 	p: AgentProgress | undefined,
 	lc: SubagentLifecyclePayload | undefined,
 	now: number,
+	t: (en: string) => string,
 ): string {
 	if (p?.currentTool) {
 		const start = toolStartMs(p);
@@ -43,8 +45,8 @@ function activityLine(
 		return p.currentTool;
 	}
 	if (p?.lastIntent) return p.lastIntent;
-	if (lc) return lc.status;
-	return agent.status;
+	if (lc) return t(lc.status);
+	return t(agent.status);
 }
 
 function AgentRow(props: {
@@ -55,6 +57,7 @@ function AgentRow(props: {
 	now: number;
 	onSelect(id: string | null): void;
 }): ReactNode {
+	const { t } = useI18n();
 	const { agent, payload, lifecycle, selected, now, onSelect } = props;
 	const p = payload?.progress;
 	return (
@@ -66,9 +69,9 @@ function AgentRow(props: {
 			<span className="ag-row-head">
 				<span className={`ag-dot ag-dot--${agent.status}`} />
 				<span className="ag-row-name">{agent.displayName}</span>
-				<span className="ag-chip">{agent.kind}</span>
+				<span className="ag-chip">{t(agent.kind)}</span>
 			</span>
-			<span className="ag-row-activity">{activityLine(agent, p, lifecycle, now)}</span>
+			<span className="ag-row-activity">{activityLine(agent, p, lifecycle, now, t)}</span>
 			<span className="ag-row-meta">
 				{p ? <span>{fmtTokens(p.tokens)} tok</span> : null}
 				{p ? <span>{fmtCost(p.cost)}</span> : null}
@@ -85,6 +88,7 @@ export function AgentsPanel(props: {
 	selectedId: string | null;
 	onSelect(id: string | null): void;
 }): ReactNode {
+	const { t } = useI18n();
 	const { agents, progress, lifecycle, selectedId, onSelect } = props;
 	const now = useNow(1000);
 
@@ -125,7 +129,7 @@ export function AgentsPanel(props: {
 					onSelect={onSelect}
 				/>
 			))}
-			{sorted.subs.length === 0 ? <div className="ag-empty">no subagents</div> : null}
+			{sorted.subs.length === 0 ? <div className="ag-empty">{t("no subagents")}</div> : null}
 		</div>
 	);
 }
