@@ -5,6 +5,7 @@ import type { SlashCommand } from "../discovery";
 import { loadCapability } from "../discovery";
 import { EMBEDDED_COMMAND_TEMPLATES } from "../task/commands";
 import { parseCommandArgs, substituteArgs } from "../utils/command-args";
+import { type CommandDispatchSpec, parseCommandDispatchSpec } from "./command-dispatch";
 
 export type SlashCommandSource = "extension" | "prompt" | "skill";
 
@@ -30,6 +31,8 @@ export interface FileSlashCommand {
 	source: string; // e.g., "via Claude Code (User)"
 	/** Source metadata for display */
 	_source?: { providerName: string; level: "user" | "project" | "native" };
+	/** zcode fork: agent/model dispatch directives parsed from frontmatter. */
+	dispatch?: CommandDispatchSpec;
 }
 
 const EMBEDDED_SLASH_COMMANDS = EMBEDDED_COMMAND_TEMPLATES;
@@ -82,6 +85,7 @@ export async function loadSlashCommands(options: LoadSlashCommandsOptions = {}):
 			content: body,
 			source: sourceStr,
 			_source: { providerName: cmd._source.providerName, level: cmd.level },
+			dispatch: parseCommandDispatchSpec(cmd.content, cmd.path ?? `slash-command:${cmd.name}`),
 		};
 	});
 
