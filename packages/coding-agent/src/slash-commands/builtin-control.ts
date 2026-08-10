@@ -1,3 +1,4 @@
+import { t, tf } from "../i18n";
 import { runPauseScreen } from "../modes/components/pause-screen";
 import { shutdownHandlerTui } from "./builtin-lifecycle";
 import { commandConsumed, errorMessage, usage } from "./helpers/parse";
@@ -12,7 +13,7 @@ export const BUILTIN_CONTROL_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
 			const count = runtime.ctx.session.getActiveToolNames().length;
-			return count === 0 ? "Force: no active tools" : `Force: ${count} active tools`;
+			return count === 0 ? t("Force: no active tools") : tf("Force: {0} active tools", String(count));
 		},
 		handle: async (command, runtime) => {
 			const spaceIdx = command.args.indexOf(" ");

@@ -1,3 +1,5 @@
+import { tf } from "../i18n";
+
 export type LoopLimitConfig =
 	| {
 			kind: "iterations";
@@ -166,27 +168,35 @@ export function isLoopDurationExpired(limit: LoopLimitRuntime | undefined, nowMs
 
 export function describeLoopLimit(config: LoopLimitConfig): string {
 	if (config.kind === "iterations") {
-		return `${config.iterations} ${config.iterations === 1 ? "iteration" : "iterations"}`;
+		// Singular/plural stay separate keys so the English fallback keeps correct
+		// grammar; Chinese maps both to the same measure-word form.
+		return config.iterations === 1
+			? tf("{0} iteration", String(config.iterations))
+			: tf("{0} iterations", String(config.iterations));
 	}
 	return formatDuration(config.durationMs);
 }
 
 export function describeLoopLimitRuntime(limit: LoopLimitRuntime): string {
 	if (limit.kind === "iterations") {
-		return `${limit.remaining} of ${limit.initial} ${limit.initial === 1 ? "iteration" : "iterations"} remaining`;
+		const remaining = String(limit.remaining);
+		const initial = String(limit.initial);
+		return limit.initial === 1
+			? tf("{0} of {1} iteration remaining", remaining, initial)
+			: tf("{0} of {1} iterations remaining", remaining, initial);
 	}
-	return `${formatDuration(limit.durationMs)} limit`;
+	return tf("{0} limit", formatDuration(limit.durationMs));
 }
 
 function formatDuration(durationMs: number): string {
 	if (durationMs % 3_600_000 === 0) {
 		const hours = durationMs / 3_600_000;
-		return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+		return hours === 1 ? tf("{0} hour", String(hours)) : tf("{0} hours", String(hours));
 	}
 	if (durationMs % 60_000 === 0) {
 		const minutes = durationMs / 60_000;
-		return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+		return minutes === 1 ? tf("{0} minute", String(minutes)) : tf("{0} minutes", String(minutes));
 	}
 	const seconds = durationMs / 1_000;
-	return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
+	return seconds === 1 ? tf("{0} second", String(seconds)) : tf("{0} seconds", String(seconds));
 }

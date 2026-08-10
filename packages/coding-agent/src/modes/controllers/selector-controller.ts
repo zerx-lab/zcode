@@ -5,7 +5,7 @@ import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
 import type { OAuthProvider } from "@oh-my-pi/pi-ai/oauth/types";
 import type { Component, OverlayHandle } from "@oh-my-pi/pi-tui";
 import { Loader, Spacer, setTuiTight, Text } from "@oh-my-pi/pi-tui";
-import { getAgentDbPath, getAgentDir, getProjectDir, normalizePathForComparison } from "@oh-my-pi/pi-utils";
+import { getAgentDbPath, getAgentDir, getProjectDir, logger, normalizePathForComparison } from "@oh-my-pi/pi-utils";
 import {
 	type AdvisorConfigScope,
 	discoverAdvisorConfigs,
@@ -30,6 +30,7 @@ import {
 	getPluginsCacheDir,
 	MarketplaceManager,
 } from "../../extensibility/plugins/marketplace";
+import { LANGUAGE_SETTING_PATH, refreshLocale } from "../../i18n";
 import {
 	getAvailableThemes,
 	getSymbolTheme,
@@ -430,6 +431,21 @@ export class SelectorController {
 			} else {
 				disableProvider(providerId);
 			}
+			return;
+		}
+
+		// Builtin slash-command descriptions are localized when the command table is
+		// built, so the language change has to re-run that build. Refresh the locale
+		// cache first: this callback fires *before* the panel's own #relocalize(),
+		// so without it the rebuild would read the previous language.
+		if (id === LANGUAGE_SETTING_PATH) {
+			refreshLocale();
+			void this.ctx.refreshSlashCommandState().catch(error => {
+				logger.warn("Failed to refresh slash commands after a language change", { error: String(error) });
+			});
+			this.ctx.statusLine.invalidate();
+			this.ctx.ui.invalidate();
+			this.ctx.ui.requestRender();
 			return;
 		}
 

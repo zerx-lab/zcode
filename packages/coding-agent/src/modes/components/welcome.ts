@@ -8,6 +8,7 @@ import {
 	wrapTextWithAnsi,
 } from "@oh-my-pi/pi-tui";
 import { APP_NAME } from "@oh-my-pi/pi-utils";
+import { getLocale, t, tTip } from "../../i18n";
 import { theme } from "../../modes/theme/theme";
 import { BRAND_GRADIENT_RAMP_256, BRAND_GRADIENT_STOPS, ZCODE_LOGO } from "./brand-logo";
 import tipsText from "./tips.txt" with { type: "text" };
@@ -84,7 +85,7 @@ function renderNewTag(phase: number, encoding: ColorEncoding): string {
 	return out + reset;
 }
 export function renderWelcomeTip(tip: string, boxWidth: number, phase = 0): string[] {
-	const label = "Tip: ";
+	const label = `${t("Tip")}: `;
 	const labelWidth = visibleWidth(label);
 	const bodyBudget = boxWidth - 1 - labelWidth; // 1 = leading indent
 	if (bodyBudget < 8) return [];
@@ -148,6 +149,7 @@ export class WelcomeComponent implements Component {
 	// Bypassed while the intro animation runs (every frame differs).
 	#cachedWidth = -1;
 	#cachedLines: string[] | undefined;
+	#cachedLocale: string | undefined;
 
 	constructor(
 		private readonly version: string,
@@ -164,7 +166,9 @@ export class WelcomeComponent implements Component {
 				this.#selectedTip = pickWeightedTip(TIPS, Math.random());
 			}
 		}
-		return this.#selectedTip || undefined;
+		// Cache the English source, translate on read: the picked tip must survive
+		// a language switch (the box is re-rendered, not reconstructed).
+		return this.#selectedTip ? tTip(this.#selectedTip) : undefined;
 	}
 
 	invalidate(): void {
@@ -218,16 +222,21 @@ export class WelcomeComponent implements Component {
 
 	render(termWidth: number): readonly string[] {
 		const animating = this.#animStart != null;
-		if (!animating && this.#cachedLines && this.#cachedWidth === termWidth) {
+		// Locale is part of the cache key: switching the UI language re-renders the
+		// box without reconstructing it, and nothing calls invalidate() for it.
+		const locale = getLocale();
+		if (!animating && this.#cachedLines && this.#cachedWidth === termWidth && this.#cachedLocale === locale) {
 			return this.#cachedLines;
 		}
 		const lines = this.#renderLines(termWidth);
 		if (animating) {
 			this.#cachedLines = undefined;
 			this.#cachedWidth = -1;
+			this.#cachedLocale = undefined;
 		} else {
 			this.#cachedLines = lines;
 			this.#cachedWidth = termWidth;
+			this.#cachedLocale = locale;
 		}
 		return lines;
 	}
@@ -245,7 +254,7 @@ export class WelcomeComponent implements Component {
 		const minRightCol = 20;
 		const leftMinContentWidth = Math.max(
 			minLeftCol,
-			visibleWidth("Welcome back!"),
+			visibleWidth(t("Welcome back!")),
 			visibleWidth(this.modelName),
 			visibleWidth(this.providerName),
 		);
@@ -265,7 +274,7 @@ export class WelcomeComponent implements Component {
 		// Left column - centered content
 		const leftLines = [
 			"",
-			this.#centerText(theme.bold("Welcome back!"), leftCol),
+			this.#centerText(theme.bold(t("Welcome back!")), leftCol),
 			"",
 			...logoColored.map(l => this.#centerText(l, leftCol)),
 			"",
@@ -280,7 +289,7 @@ export class WelcomeComponent implements Component {
 		// Recent sessions content
 		const sessionLines: string[] = [];
 		if (this.recentSessions.length === 0) {
-			sessionLines.push(` ${theme.fg("dim", "No recent sessions")}`);
+			sessionLines.push(` ${theme.fg("dim", t("No recent sessions"))}`);
 		} else {
 			// Reserve width for the bullet prefix (" • ") and the trailing " (timeAgo)"
 			// so the relative time is never the part that gets truncated. The name
@@ -306,7 +315,7 @@ export class WelcomeComponent implements Component {
 		// LSP servers content
 		const lspLines: string[] = [];
 		if (this.lspServers.length === 0) {
-			lspLines.push(` ${theme.fg("dim", "No LSP servers")}`);
+			lspLines.push(` ${theme.fg("dim", t("No LSP servers"))}`);
 		} else {
 			for (const server of this.lspServers.slice(0, WELCOME_LSP_SLOTS)) {
 				const icon =
@@ -328,16 +337,16 @@ export class WelcomeComponent implements Component {
 
 		// Right column
 		const rightLines = [
-			` ${theme.bold(theme.fg("accent", "Tips"))}`,
-			` ${theme.fg("dim", "#")}${theme.fg("muted", " for prompt actions")}`,
-			` ${theme.fg("dim", "/")}${theme.fg("muted", " for commands")}`,
-			` ${theme.fg("dim", "!")}${theme.fg("muted", " to run bash")}`,
-			` ${theme.fg("dim", "$")}${theme.fg("muted", " to run python")}`,
+			` ${theme.bold(theme.fg("accent", t("Tips")))}`,
+			` ${theme.fg("dim", "#")}${theme.fg("muted", t(" for prompt actions"))}`,
+			` ${theme.fg("dim", "/")}${theme.fg("muted", t(" for commands"))}`,
+			` ${theme.fg("dim", "!")}${theme.fg("muted", t(" to run bash"))}`,
+			` ${theme.fg("dim", "$")}${theme.fg("muted", t(" to run python"))}`,
 			separator,
-			` ${theme.bold(theme.fg("accent", "LSP Servers"))}`,
+			` ${theme.bold(theme.fg("accent", t("LSP Servers")))}`,
 			...lspLines,
 			separator,
-			` ${theme.bold(theme.fg("accent", "Recent sessions"))}`,
+			` ${theme.bold(theme.fg("accent", t("Recent sessions")))}`,
 			...sessionLines,
 			"",
 		];

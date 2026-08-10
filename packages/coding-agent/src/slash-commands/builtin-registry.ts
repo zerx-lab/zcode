@@ -1,5 +1,6 @@
 import type { AutocompleteItem } from "@oh-my-pi/pi-tui";
 import { COLLAB_GUEST_ALLOWED_COMMANDS } from "../collab/guest";
+import { localizeSlashCommands } from "../i18n";
 import { BUILTIN_COLLABORATION_SLASH_COMMANDS } from "./builtin-collaboration";
 import {
 	buildArgumentCompletions,
@@ -97,8 +98,12 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<TuiBuiltinSlashCommand> = BUI
 	materializeTuiBuiltinSlashCommand(cmd),
 );
 
+/**
+ * TUI 命令表。描述在这里本地化：这是 TUI 唯一的活体构建出口，
+ * 语言变更后由 `refreshSlashCommandState()` 重新调用即可跟随。
+ */
 export function buildTuiBuiltinSlashCommands(runtime: TuiSlashCommandRuntime): ReadonlyArray<TuiBuiltinSlashCommand> {
-	return BUILTIN_SLASH_COMMAND_DEFS.map(cmd => materializeTuiBuiltinSlashCommand(cmd, runtime));
+	return localizeSlashCommands(BUILTIN_SLASH_COMMAND_DEFS).map(cmd => materializeTuiBuiltinSlashCommand(cmd, runtime));
 }
 
 /**
