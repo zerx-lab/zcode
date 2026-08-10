@@ -1,3 +1,4 @@
+import { BRAND_DISPLAY_NAME } from "@oh-my-pi/pi-utils/brand-consts";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentDrawer } from "./components/agents/AgentDrawer";
@@ -104,7 +105,7 @@ export function App(): ReactNode {
 	}, [connect]);
 
 	useEffect(() => {
-		if (!client) document.title = "omp collab";
+		if (!client) document.title = `${BRAND_DISPLAY_NAME} collab`;
 	}, [client]);
 
 	if (!client) {
@@ -149,7 +150,7 @@ function Session({ client, onLeave, onRejoin }: SessionProps): ReactNode {
 
 	const title = snap.header?.title ?? snap.state?.sessionName ?? "session";
 	useEffect(() => {
-		document.title = `${title} · omp collab`;
+		document.title = `${title} · ${BRAND_DISPLAY_NAME} collab`;
 	}, [title]);
 
 	const drawerAgent = selectedId != null ? snap.agents.find(a => a.id === selectedId) : undefined;

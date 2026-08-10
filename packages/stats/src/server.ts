@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { isEnoent } from "@oh-my-pi/pi-utils";
+import { BRAND_DISPLAY_NAME } from "@oh-my-pi/pi-utils/brand-consts";
 import { $ } from "bun";
 import {
 	getBehaviorDashboardStats,
@@ -177,7 +178,7 @@ const ensureClientBuild = async () => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Usage Statistics</title>
+    <title>${BRAND_DISPLAY_NAME.toUpperCase()} · AI Usage Statistics</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>

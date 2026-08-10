@@ -1,5 +1,6 @@
 /** `edit` / `apply_patch` — hashline patch application rendered as colored diffs. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badge, DiffBlock, InvalidArg, Kv, KvGrid, Note, Output, PathText, ResultText } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, isRecord, normalizeWs, num, str, truncate } from "../util";
@@ -92,6 +93,7 @@ function fileEntry(d: Record<string, unknown>): FileEntry {
 }
 
 function Summary({ args, result }: ToolRenderProps): ReactNode {
+	const { t, tf } = useI18n();
 	const input = str(args.input) ?? str(args._input);
 	const paths = input ? inputPaths(input) : [];
 	const argPath = str(args.file_path) ?? str(args.path);
@@ -113,15 +115,13 @@ function Summary({ args, result }: ToolRenderProps): ReactNode {
 			{paths.length > 1 && (
 				<>
 					{" "}
-					<Badge>+{paths.length - 1} more</Badge>
+					<Badge>{tf("+{0} more", paths.length - 1)}</Badge>
 				</>
 			)}
 			{opCount > 0 && (
 				<>
 					{" "}
-					<Badge>
-						{opCount} op{opCount === 1 ? "" : "s"}
-					</Badge>
+					<Badge>{tf("{0} ops", opCount)}</Badge>
 				</>
 			)}
 			{stats !== null && stats.added > 0 && (
@@ -139,7 +139,7 @@ function Summary({ args, result }: ToolRenderProps): ReactNode {
 			{result?.isError === true && (
 				<>
 					{" "}
-					<Badge tone="err">failed</Badge>
+					<Badge tone="err">{t("failed")}</Badge>
 				</>
 			)}
 		</>
@@ -147,6 +147,7 @@ function Summary({ args, result }: ToolRenderProps): ReactNode {
 }
 
 function FileSection({ entry, fallbackPath }: { entry: FileEntry; fallbackPath?: string | null }): ReactNode {
+	const { t } = useI18n();
 	const path = entry.path ?? fallbackPath ?? null;
 	const op = entry.op === "create" || entry.op === "delete" ? entry.op : null;
 	const diag = entry.diagnostics;
@@ -165,13 +166,15 @@ function FileSection({ entry, fallbackPath }: { entry: FileEntry; fallbackPath?:
 						{op !== null && (
 							<>
 								{" "}
-								<Badge tone={op === "delete" ? "err" : "ok"}>{op}</Badge>
+								<Badge tone={op === "delete" ? "err" : "ok"}>
+									{op === "delete" ? t("delete") : t("create")}
+								</Badge>
 							</>
 						)}
 						{entry.isError && (
 							<>
 								{" "}
-								<Badge tone="err">failed</Badge>
+								<Badge tone="err">{t("failed")}</Badge>
 							</>
 						)}
 					</span>
@@ -187,6 +190,7 @@ function FileSection({ entry, fallbackPath }: { entry: FileEntry; fallbackPath?:
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { t } = useI18n();
 	const input = str(args.input) ?? str(args._input);
 	const details = detailsRecord(result);
 	const perFile: FileEntry[] = [];
@@ -220,18 +224,18 @@ function Body({ args, result }: ToolRenderProps): ReactNode {
 				<KvGrid>
 					{args.edits.map((e, i) =>
 						isRecord(e) ? (
-							<Kv key={`${i}`} k={str(e.op) ?? "edit"}>
+							<Kv key={`${i}`} k={str(e.op) ?? t("edit")}>
 								{str(e.sel) ?? str(e.path) ?? str(e.rename) ?? str(e.move) ?? "?"}
 							</Kv>
 						) : (
-							<Kv key={`${i}`} k="edit">
+							<Kv key={`${i}`} k={t("edit")}>
 								<InvalidArg what="edit" />
 							</Kv>
 						),
 					)}
 				</KvGrid>
 			)}
-			{input !== null && input.length > 0 && <Output text={input} variant="code" maxLines={10} title="input" />}
+			{input !== null && input.length > 0 && <Output text={input} variant="code" maxLines={10} title={t("input")} />}
 			{input === null && (args.input !== undefined || args._input !== undefined) && <InvalidArg what="input" />}
 		</>
 	);

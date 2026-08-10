@@ -1,4 +1,5 @@
 import type React from "react";
+import { t } from "../i18n";
 
 export interface DataTableColumn<T> {
 	key: string;
@@ -23,7 +24,7 @@ export function DataTable<T>({
 	keyExtractor,
 	onRowClick,
 	renderMobileCard,
-	emptyText = "No data available",
+	emptyText = t("No data available"),
 }: DataTableProps<T>) {
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTableRowElement>, item: T) => {
 		if (onRowClick && (e.key === "Enter" || e.key === " ")) {

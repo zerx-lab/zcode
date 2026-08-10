@@ -1,5 +1,6 @@
 /** `debug` — DAP debugger sessions: launch/attach, breakpoints, stepping, evaluate. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badge, CodeBlock, Kv, KvGrid, PathText, ResultText } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, display, isRecord, normalizeWs, num, str, truncate } from "../util";
@@ -39,9 +40,9 @@ function snapshotOf(result: ToolRenderProps["result"]): SessionSnapshot | null {
 	};
 }
 
-function actionOf(props: ToolRenderProps): string {
+function actionOf(props: ToolRenderProps, t: (en: string) => string): string {
 	const action = str(props.args.action) ?? str(detailsRecord(props.result)?.action);
-	return action ? action.replace(/_/g, " ") : "request";
+	return action ? action.replace(/_/g, " ") : t("request");
 }
 
 /** Mirrors the TUI's summarizeDebugCall target priority. */
@@ -58,6 +59,7 @@ function targetTextOf(args: Record<string, unknown>): string | null {
 }
 
 function Summary(props: ToolRenderProps): ReactNode {
+	const { t } = useI18n();
 	const { args } = props;
 	const program = str(args.program);
 	const file = str(args.file);
@@ -65,7 +67,7 @@ function Summary(props: ToolRenderProps): ReactNode {
 	const target = targetTextOf(args);
 	return (
 		<>
-			<Badge tone="accent">{actionOf(props)}</Badge>
+			<Badge tone="accent">{actionOf(props, t)}</Badge>
 			{program !== null ? (
 				<PathText path={program} />
 			) : file !== null ? (
@@ -111,6 +113,7 @@ const SCALAR_ARGS: ReadonlyArray<readonly [key: string, label: string]> = [
 ];
 
 function Body(props: ToolRenderProps): ReactNode {
+	const { t } = useI18n();
 	const { args, result } = props;
 	const program = str(args.program);
 	const file = str(args.file);
@@ -173,10 +176,10 @@ function Body(props: ToolRenderProps): ReactNode {
 			{customArgsJson && <CodeBlock code={customArgsJson} lang="json" title="arguments" maxLines={10} />}
 			{snapshot && (
 				<KvGrid>
-					{snapshot.id !== null && <Kv k="session">{snapshot.id}</Kv>}
+					{snapshot.id !== null && <Kv k={t("session")}>{snapshot.id}</Kv>}
 					{snapshot.adapter !== null && <Kv k="adapter">{snapshot.adapter}</Kv>}
 					{snapshot.status !== null && (
-						<Kv k="status">
+						<Kv k={t("status")}>
 							<Badge tone={snapshot.status === "exited" ? "warn" : "ok"}>{snapshot.status}</Badge>
 						</Kv>
 					)}
@@ -185,19 +188,19 @@ function Body(props: ToolRenderProps): ReactNode {
 							<PathText path={snapshot.program} />
 						</Kv>
 					)}
-					{snapshot.stopReason !== null && <Kv k="stop reason">{snapshot.stopReason}</Kv>}
-					{snapshot.frameName !== null && <Kv k="frame">{snapshot.frameName}</Kv>}
+					{snapshot.stopReason !== null && <Kv k={t("stop reason")}>{snapshot.stopReason}</Kv>}
+					{snapshot.frameName !== null && <Kv k={t("frame")}>{snapshot.frameName}</Kv>}
 					{snapshot.sourcePath !== null && snapshot.line !== null && (
-						<Kv k="location">
+						<Kv k={t("location")}>
 							<PathText
 								path={snapshot.sourcePath}
 								sel={snapshot.column !== null ? `${snapshot.line}:${snapshot.column}` : String(snapshot.line)}
 							/>
 						</Kv>
 					)}
-					{snapshot.exitCode !== null && <Kv k="exit code">{snapshot.exitCode}</Kv>}
+					{snapshot.exitCode !== null && <Kv k={t("exit code")}>{snapshot.exitCode}</Kv>}
 					{snapshot.needsConfigurationDone && (
-						<Kv k="configuration">pending configurationDone — set breakpoints, then continue</Kv>
+						<Kv k={t("configuration")}>{t("pending configurationDone — set breakpoints, then continue")}</Kv>
 					)}
 				</KvGrid>
 			)}

@@ -9,6 +9,7 @@
  */
 
 import type { GuestFrame, HostFrame, RelayControlMessage } from "@oh-my-pi/pi-wire";
+import { t, tf } from "../i18n";
 import { open, seal } from "./codec";
 import { packEnvelope, unpackEnvelope } from "./link";
 
@@ -157,7 +158,7 @@ export class CollabSocket {
 				try {
 					frame = (await open(await this.#opts.key, envelope.payload)) as HostFrame;
 				} catch {
-					this.#failFatal("bad key or corrupted frame");
+					this.#failFatal(t("bad key or corrupted frame"));
 					return;
 				}
 				if (this.#ws !== ws) return;
@@ -174,10 +175,10 @@ export class CollabSocket {
 		if (fatalReason !== undefined) {
 			this.#closed = true;
 			this.#pendingSends.length = 0;
-			this.onClose?.(fatalReason, false);
+			this.onClose?.(t(fatalReason), false);
 			return;
 		}
-		this.onClose?.(reason || `connection lost (code ${code})`, true);
+		this.onClose?.(reason || tf("connection lost (code {0})", code), true);
 		this.#scheduleRetry();
 	}
 

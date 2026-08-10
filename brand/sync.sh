@@ -7,6 +7,10 @@ cd "$(git rev-parse --show-toplevel)"
 # 提交门禁（幂等）：拦截被中断的 binary build 留下的 populated 占位文件
 git config core.hooksPath brand/hooks
 
+# rerere：记录冲突解法，供 CI (sync-upstream.yml) 自动重放
+git config rerere.enabled true
+git config rerere.autoupdate true
+
 git fetch upstream --no-tags
 
 # 首次建立漂移基线（可动 ref，全绿后才推进）
@@ -56,7 +60,20 @@ bun check || {
 	exit 1
 }
 
-# 5) 推进漂移基线
+# 5) 推进漂移基线 + 发布 rerere 解法给 CI
 git update-ref refs/brand/last-sync upstream/main
+if [[ -d .git/rr-cache && -n $(ls -A .git/rr-cache 2>/dev/null) ]]; then
+	gitdir=$(git rev-parse --absolute-git-dir)
+	rr_tree=$(
+		export GIT_DIR=$gitdir GIT_WORK_TREE=$gitdir/rr-cache GIT_INDEX_FILE=$gitdir/rr-pub-index
+		git -C "$GIT_WORK_TREE" add -A && git write-tree
+	)
+	rm -f "$gitdir/rr-pub-index"
+	if [[ -n $rr_tree ]]; then
+		rr_commit=$(git commit-tree "$rr_tree" -m "chore(brand): rerere cache snapshot")
+		git update-ref refs/brand/rr-cache "$rr_commit"
+		git push origin +refs/brand/rr-cache:refs/brand/rr-cache
+	fi
+fi
 echo "=== 同步完成: zcode @ $(git rev-parse --short zcode), baseline @ $(git rev-parse --short refs/brand/last-sync) ==="
 echo "（HEAD 已回到 zcode；release 是派生物，别在上面提交）"

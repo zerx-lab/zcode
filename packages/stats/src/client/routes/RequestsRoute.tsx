@@ -1,7 +1,9 @@
+import { BRAND_DISPLAY_NAME } from "@oh-my-pi/pi-utils/brand-consts";
 import { useMemo } from "react";
 import { getRecentRequests } from "../api";
 import { formatCost, formatDurationMs, formatInteger, formatRelativeTime } from "../data/formatters";
 import { useResource } from "../data/useResource";
+import { t, tf } from "../i18n";
 import type { MessageStats, TimeRange } from "../types";
 import { AsyncBoundary, DataTable, Panel, StatusPill } from "../ui";
 
@@ -26,7 +28,7 @@ export function RequestsRoute({ active, refreshTrigger, onRequestClick }: Reques
 		() => [
 			{
 				key: "model",
-				header: "Model",
+				header: t("Model"),
 				render: (item: MessageStats) => (
 					<div>
 						<div className="stats-font-medium stats-text-primary">{item.model}</div>
@@ -36,34 +38,34 @@ export function RequestsRoute({ active, refreshTrigger, onRequestClick }: Reques
 			},
 			{
 				key: "timestamp",
-				header: "Time",
+				header: t("Time"),
 				render: (item: MessageStats) => formatRelativeTime(item.timestamp),
 			},
 			{
 				key: "tokens",
-				header: "Tokens",
+				header: t("Tokens"),
 				numeric: true,
 				render: (item: MessageStats) => formatInteger(item.usage.totalTokens),
 			},
 			{
 				key: "cost",
-				header: "Cost",
+				header: t("Cost"),
 				numeric: true,
 				render: (item: MessageStats) => formatCost(item.usage.cost.total, 4),
 			},
 			{
 				key: "duration",
-				header: "Duration",
+				header: t("Duration"),
 				numeric: true,
 				render: (item: MessageStats) => formatDurationMs(item.duration),
 			},
 			{
 				key: "status",
-				header: "Status",
+				header: t("Status"),
 				className: "stats-text-center",
 				render: (item: MessageStats) => (
 					<StatusPill variant={item.errorMessage ? "danger" : "success"}>
-						{item.errorMessage ? "Failed" : "Success"}
+						{item.errorMessage ? t("Failed") : t("Success")}
 					</StatusPill>
 				),
 			},
@@ -79,24 +81,24 @@ export function RequestsRoute({ active, refreshTrigger, onRequestClick }: Reques
 					<div className="stats-text-xs stats-text-muted">{item.provider}</div>
 				</div>
 				<StatusPill variant={item.errorMessage ? "danger" : "success"}>
-					{item.errorMessage ? "Failed" : "Success"}
+					{item.errorMessage ? t("Failed") : t("Success")}
 				</StatusPill>
 			</div>
 			<div className="stats-mobile-card-grid">
 				<div>
-					<div className="stats-mobile-card-label">Time</div>
+					<div className="stats-mobile-card-label">{t("Time")}</div>
 					<div className="stats-mobile-card-value">{formatRelativeTime(item.timestamp)}</div>
 				</div>
 				<div>
-					<div className="stats-mobile-card-label">Cost</div>
+					<div className="stats-mobile-card-label">{t("Cost")}</div>
 					<div className="stats-mobile-card-value">{formatCost(item.usage.cost.total, 4)}</div>
 				</div>
 				<div>
-					<div className="stats-mobile-card-label">Tokens</div>
+					<div className="stats-mobile-card-label">{t("Tokens")}</div>
 					<div className="stats-mobile-card-value">{formatInteger(item.usage.totalTokens)}</div>
 				</div>
 				<div>
-					<div className="stats-mobile-card-label">Duration</div>
+					<div className="stats-mobile-card-label">{t("Duration")}</div>
 					<div className="stats-mobile-card-value">{formatDurationMs(item.duration)}</div>
 				</div>
 			</div>
@@ -106,7 +108,10 @@ export function RequestsRoute({ active, refreshTrigger, onRequestClick }: Reques
 
 	return (
 		<div className="stats-route-container">
-			<Panel title="All Recent Requests" subtitle="Up to 50 most recent requests processed by OMP">
+			<Panel
+				title={t("All Recent Requests")}
+				subtitle={tf("Up to 50 most recent requests processed by {0}", BRAND_DISPLAY_NAME)}
+			>
 				<AsyncBoundary loading={loading} error={error} data={recentRequests}>
 					<DataTable
 						columns={columns}
@@ -114,7 +119,7 @@ export function RequestsRoute({ active, refreshTrigger, onRequestClick }: Reques
 						keyExtractor={item => item.id || `${item.sessionFile}-${item.entryId}`}
 						onRowClick={item => item.id && onRequestClick(item.id)}
 						renderMobileCard={renderMobileCard}
-						emptyText="No recent requests found"
+						emptyText={t("No recent requests found")}
 					/>
 				</AsyncBoundary>
 			</Panel>

@@ -1,6 +1,7 @@
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { sync } from "../api";
+import { t, tf } from "../i18n";
 
 export interface SyncButtonProps {
 	onSyncStart?: () => void;
@@ -34,7 +35,7 @@ export function SyncButton({ onSyncStart, onSyncComplete, className = "" }: Sync
 			};
 			setStatus({
 				type: "success",
-				message: `Synced: ${result.processed} new request${result.processed === 1 ? "" : "s"} found.`,
+				message: tf("Synced: {0} new request{1} found.", result.processed, result.processed === 1 ? "" : "s"),
 			});
 			if (onSyncComplete) {
 				onSyncComplete({ success: true, data: result });
@@ -43,7 +44,7 @@ export function SyncButton({ onSyncStart, onSyncComplete, className = "" }: Sync
 			const errorMessage = err instanceof Error ? err.message : String(err);
 			setStatus({
 				type: "error",
-				message: `Sync failed: ${errorMessage}`,
+				message: tf("Sync failed: {0}", errorMessage),
 			});
 			if (onSyncComplete) {
 				onSyncComplete({ success: false, error: errorMessage });
@@ -68,7 +69,7 @@ export function SyncButton({ onSyncStart, onSyncComplete, className = "" }: Sync
 				aria-busy={syncing}
 			>
 				<RefreshCw size={14} className={`stats-sync-icon ${syncing ? "stats-spin" : ""}`} />
-				{syncing ? "Syncing..." : "Sync DB"}
+				{syncing ? t("Syncing...") : t("Sync DB")}
 			</button>
 		</div>
 	);

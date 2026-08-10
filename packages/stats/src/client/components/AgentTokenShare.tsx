@@ -1,16 +1,17 @@
 import { useMemo } from "react";
 import { formatCompact, formatInteger, formatPercent } from "../data/formatters";
 import { buildAgentTokenShare } from "../data/view-models";
+import { t, tf } from "../i18n";
 import type { AgentType, AgentTypeStats } from "../types";
 
 /**
- * Per-agent-type display chrome. Colors follow the OMP brand palette
- * (pink -> violet -> cyan) used by the dashboard charts so the bar reads on
- * both themes without per-theme overrides.
+ * Per-agent-type display chrome. Colors follow the zcode brand palette
+ * (pink -> brand blue -> cyan) used by the dashboard charts so the bar reads on
+ * both themes without per-theme overrides. Blue = brand-consts BRAND_RAMP[1].
  */
 const AGENT_META: Record<AgentType, { label: string; color: string }> = {
 	main: { label: "Main agent", color: "#ed4abf" },
-	subagent: { label: "Subagents", color: "#9b4dff" },
+	subagent: { label: "Subagents", color: "#2396d6" },
 	advisor: { label: "Advisor", color: "#5ad8e6" },
 };
 
@@ -22,7 +23,7 @@ export function AgentTokenShare({ stats }: AgentTokenShareProps) {
 	const view = useMemo(() => buildAgentTokenShare(stats), [stats]);
 
 	if (view.totalTokens === 0) {
-		return <div className="py-8 text-center stats-text-muted text-sm">No token usage in this range</div>;
+		return <div className="py-8 text-center stats-text-muted text-sm">{t("No token usage in this range")}</div>;
 	}
 
 	return (
@@ -35,7 +36,7 @@ export function AgentTokenShare({ stats }: AgentTokenShareProps) {
 								key={seg.agentType}
 								className="h-full"
 								style={{ width: `${seg.share * 100}%`, background: AGENT_META[seg.agentType].color }}
-								title={`${AGENT_META[seg.agentType].label}: ${formatPercent(seg.share)}`}
+								title={`${t(AGENT_META[seg.agentType].label)}: ${formatPercent(seg.share)}`}
 							/>
 						),
 				)}
@@ -49,13 +50,13 @@ export function AgentTokenShare({ stats }: AgentTokenShareProps) {
 								className="w-2.5 h-2.5 rounded-full flex-shrink-0"
 								style={{ background: AGENT_META[seg.agentType].color }}
 							/>
-							<span className="stats-text-primary truncate">{AGENT_META[seg.agentType].label}</span>
+							<span className="stats-text-primary truncate">{t(AGENT_META[seg.agentType].label)}</span>
 							<span className="stats-text-muted stats-text-xs whitespace-nowrap">
-								{formatInteger(seg.requests)} req
+								{tf("{0} req", formatInteger(seg.requests))}
 							</span>
 						</div>
 						<div className="flex items-center gap-3 whitespace-nowrap">
-							<span className="stats-text-secondary">{formatCompact(seg.tokens)} tok</span>
+							<span className="stats-text-secondary">{tf("{0} tok", formatCompact(seg.tokens))}</span>
 							<span className="stats-font-semibold stats-text-primary tabular-nums">
 								{formatPercent(seg.share)}
 							</span>

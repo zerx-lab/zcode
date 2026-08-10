@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { BRAND_DISPLAY_NAME } from "@oh-my-pi/pi-utils/brand-consts";
 import { compile } from "@tailwindcss/node";
 
 /**
@@ -70,7 +71,7 @@ const indexHtml = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Usage Statistics</title>
+    <title>${BRAND_DISPLAY_NAME.toUpperCase()} · AI Usage Statistics</title>
     <script>
       (function () {
         try {

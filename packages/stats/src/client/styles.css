@@ -1,29 +1,30 @@
 @import "tailwindcss/index.css";
 
 /* ==========================================================================
-   OMP Theme Variables & Color Scheme
+   Theme Variables & Color Scheme
    ========================================================================== */
 :root {
   color-scheme: dark;
-  /* OMP brand palette — packages/collab-web/src/styles/tokens.css:
-     deep-purple surfaces (hue 307), pink accent #ed4abf, cyan focus ring #5ad8e6. */
-  --page: oklch(0.16 0.02 307);
-  --surface: oklch(0.19 0.022 307);
-  --surface-2: oklch(0.235 0.026 307);
+  /* zcode palette — surfaces/charts blue derives from brand-consts.ts BRAND_RAMP;
+     interaction accent #1677ff is a stats-local token, defined ONCE below and
+     consumed everywhere else via var(--accent) / color-mix. */
+  --page: oklch(0.16 0.02 230);
+  --surface: oklch(0.19 0.022 230);
+  --surface-2: oklch(0.235 0.026 230);
   --border: oklch(1 0 0 / 9%);
   --border-strong: oklch(1 0 0 / 13%);
-  --text: oklch(0.92 0.01 307);
-  --muted: oklch(0.71 0.016 307);
-  --dim: oklch(0.53 0.018 307);
-  --accent: oklch(0.674 0.23 341);          /* brand pink #ed4abf */
-  --accent-fg: oklch(0.2 0.07 341);         /* ink on accent fills */
-  --accent-muted: oklch(0.674 0.23 341 / 18%);
+  --text: oklch(0.92 0.01 230);
+  --muted: oklch(0.71 0.016 230);
+  --dim: oklch(0.53 0.018 230);
+  --accent: #1677ff;                        /* interaction accent (single source) */
+  --accent-fg: #ffffff;                     /* ink on accent fills */
+  --accent-muted: color-mix(in srgb, var(--accent) 20%, transparent);
   --link: oklch(0.817 0.112 205);           /* brand cyan #5ad8e6 */
   --success: oklch(0.76 0.14 150);
   --danger: oklch(0.66 0.19 25);
   --warning: oklch(0.79 0.14 85);
 
-  /* Bridge the view components' token vocabulary to the OMP base tokens so
+  /* Bridge the view components' token vocabulary to the base tokens so
      muted/secondary text and semantic accents resolve instead of silently
      falling back to inherited text color. Re-resolve per theme via var(). */
   --text-primary: var(--text);
@@ -46,17 +47,15 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --page: oklch(0.985 0.004 307);
+    --page: oklch(0.985 0.004 230);
     --surface: oklch(1 0 0);
-    --surface-2: oklch(0.965 0.006 307);
+    --surface-2: oklch(0.965 0.006 230);
     --border: oklch(0 0 0 / 10%);
     --border-strong: oklch(0 0 0 / 15%);
-    --text: oklch(0.26 0.03 307);
-    --muted: oklch(0.46 0.03 307);
-    --dim: oklch(0.58 0.025 307);
-    --accent: oklch(0.62 0.23 341);
-    --accent-fg: oklch(0.99 0.01 341);
-    --accent-muted: oklch(0.62 0.23 341 / 14%);
+    --text: oklch(0.26 0.03 230);
+    --muted: oklch(0.46 0.03 230);
+    --dim: oklch(0.58 0.025 230);
+    --accent-muted: color-mix(in srgb, var(--accent) 14%, transparent);
     --link: oklch(0.58 0.13 230);
     --success: oklch(0.55 0.13 150);
     --danger: oklch(0.55 0.19 25);
@@ -67,17 +66,15 @@
 /* Explicit theme override (toggle or persisted preference). */
 [data-theme="light"] {
   color-scheme: light;
-  --page: oklch(0.985 0.004 307);
+  --page: oklch(0.985 0.004 230);
   --surface: oklch(1 0 0);
-  --surface-2: oklch(0.965 0.006 307);
+  --surface-2: oklch(0.965 0.006 230);
   --border: oklch(0 0 0 / 10%);
   --border-strong: oklch(0 0 0 / 15%);
-  --text: oklch(0.26 0.03 307);
-  --muted: oklch(0.46 0.03 307);
-  --dim: oklch(0.58 0.025 307);
-  --accent: oklch(0.62 0.23 341);
-  --accent-fg: oklch(0.99 0.01 341);
-  --accent-muted: oklch(0.62 0.23 341 / 14%);
+  --text: oklch(0.26 0.03 230);
+  --muted: oklch(0.46 0.03 230);
+  --dim: oklch(0.58 0.025 230);
+  --accent-muted: color-mix(in srgb, var(--accent) 14%, transparent);
   --link: oklch(0.58 0.13 230);
   --success: oklch(0.55 0.13 150);
   --danger: oklch(0.55 0.19 25);
@@ -1234,7 +1231,7 @@
 }
 
 /* ==========================================================================
-   Brand mark on the OMP wordmark (both rail + mobile drawer headers)
+   Brand mark on the wordmark (both rail + mobile drawer headers)
    ========================================================================== */
 .stats-logo-container {
   display: grid;
@@ -1249,7 +1246,7 @@
   width: 16px;
   height: 16px;
   border-radius: 4px;
-  background: linear-gradient(135deg, #ed4abf 0%, #9b4dff 50%, #5ad8e6 100%); /* OMP brand gradient mark */
+  background: linear-gradient(135deg, var(--accent) 0%, #3dc7ff 55%, #7ad9ff 100%); /* brand gradient mark: accent -> BRAND_RAMP[2] -> BRAND_RAMP[3] */
 }
 
 .stats-logo-text,

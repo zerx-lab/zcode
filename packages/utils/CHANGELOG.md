@@ -15,6 +15,8 @@
 
 ### Added
 - Exported `BRAND_MARK` and single-source `BRAND_RAMP` / RGB / 256-color brand palette helpers
+### Added
+- `brand-consts.ts` browser-safe pure brand constants re-exported from `brand.ts`
 ## [17.2.11] - 2026-08-07
 
 ### Added

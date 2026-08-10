@@ -146,6 +146,23 @@
 	}
 }
 
+/* ---- language toggle (auto / en / zh-CN) ---- */
+.sh-lang-toggle {
+	position: relative;
+	gap: 3px;
+	width: auto;
+	min-width: 32px;
+	padding: 0 7px;
+}
+
+.sh-lang-badge {
+	font-family: var(--font-ui);
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1;
+	letter-spacing: 0.02em;
+}
+
 .sh-badge {
 	position: absolute;
 	top: -5px;
@@ -585,6 +602,12 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
+}
+
+.sh-connect-toggles {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
 }
 
 .sh-lockup {

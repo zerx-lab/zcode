@@ -10,6 +10,7 @@
  * card), the device name supplies the default action.
  */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import type { Tone } from "../parts";
 import { Badge, Badges, Kv, KvGrid, Note, ResultText } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
@@ -69,17 +70,19 @@ function cardModel({ name, args, result }: ToolRenderProps): ResolveCard {
 }
 
 function Summary(props: ToolRenderProps): ReactNode {
+	const { t } = useI18n();
 	const card = cardModel(props);
 	const trailing = card.kind === "propose" ? card.title : card.reason;
 	return (
 		<>
-			<Badge tone={card.tone}>{KIND_WORD[card.kind]}</Badge>{" "}
+			<Badge tone={card.tone}>{t(KIND_WORD[card.kind])}</Badge>{" "}
 			{trailing && <span>{truncate(normalizeWs(trailing), 100)}</span>}
 		</>
 	);
 }
 
 function Body(props: ToolRenderProps): ReactNode {
+	const { t } = useI18n();
 	const { result } = props;
 	const card = cardModel(props);
 	const extraRows: ReactNode[] = [];
@@ -107,7 +110,7 @@ function Body(props: ToolRenderProps): ReactNode {
 			<Badges
 				items={[
 					<Badge key="action" tone={card.tone}>
-						{KIND_TRANSITION[card.kind]}
+						{t(KIND_TRANSITION[card.kind])}
 					</Badge>,
 					card.sourceToolName && <Badge key="source">{card.sourceToolName}</Badge>,
 					card.label && <span key="label">{truncate(normalizeWs(card.label), 120)}</span>,
@@ -119,7 +122,7 @@ function Body(props: ToolRenderProps): ReactNode {
 			{card.kind !== "propose" && card.reason && <Note>{card.reason}</Note>}
 			{card.kind === "propose" && card.planFilePath && (
 				<KvGrid>
-					<Kv k="plan">{card.planFilePath}</Kv>
+					<Kv k={t("plan")}>{card.planFilePath}</Kv>
 				</KvGrid>
 			)}
 			{extraRows.length > 0 && <KvGrid>{extraRows}</KvGrid>}
