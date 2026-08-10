@@ -25,6 +25,7 @@ import {
 	type SubmenuOption,
 	TAB_GROUPS,
 } from "../../config/settings-schema";
+import { getLocale, localizeSettingDefs } from "../../i18n";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // UI Definition Types
@@ -219,12 +220,14 @@ function pathToSettingDef(path: SettingPath): SettingDef | null {
 // Public API
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** Cache of generated definitions */
+/** Cache of generated definitions, keyed by the locale they were localized for. */
 let cachedDefs: SettingDef[] | null = null;
+let cachedDefsLocale: string | null = null;
 
-/** Get all setting definitions with UI */
+/** Get all setting definitions with UI, localized for the active language */
 export function getAllSettingDefs(): SettingDef[] {
-	if (cachedDefs) return cachedDefs;
+	const locale = getLocale();
+	if (cachedDefs && cachedDefsLocale === locale) return cachedDefs;
 
 	const defs: SettingDef[] = [];
 	for (const tab of SETTING_TABS) {
@@ -233,8 +236,9 @@ export function getAllSettingDefs(): SettingDef[] {
 			if (def) defs.push(def);
 		}
 	}
-	cachedDefs = defs;
-	return defs;
+	cachedDefs = localizeSettingDefs(defs);
+	cachedDefsLocale = locale;
+	return cachedDefs;
 }
 
 /**

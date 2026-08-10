@@ -1225,6 +1225,13 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	/** Reload slash commands and autocomplete for the provided working directory. */
 	async refreshSlashCommandState(cwd?: string): Promise<void> {
+		// Rebuild the builtin block: its descriptions are localized when the table
+		// is built, so a UI language change only takes effect if we re-run it here.
+		// Idempotent for every other caller (same inputs, same output).
+		this.#pendingSlashCommands = [
+			...buildTuiBuiltinSlashCommands({ ctx: this }),
+			...this.#pendingSlashCommands.filter(command => !BUILTIN_SLASH_COMMAND_RESERVED_NAMES.has(command.name)),
+		];
 		const basePath = cwd ?? this.sessionManager.getCwd();
 		const fileCommands = await loadSlashCommands({ cwd: basePath });
 		this.fileSlashCommands = new Set(fileCommands.map(cmd => cmd.name));
