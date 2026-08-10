@@ -377,9 +377,29 @@ async function loadSlashCommands(ctx: LoadContext): Promise<LoadResult<SlashComm
 	const items: SlashCommand[] = [];
 	const warnings: string[] = [];
 
-	for (const { dir, level } of await getConfigDirs(ctx)) {
-		const commandsDir = path.join(dir, "commands");
-		const result = await loadFilesFromDir<SlashCommand>(ctx, commandsDir, PROVIDER_ID, level, {
+	// Project commands walk cwd → repoRoot exactly like `rules/` in loadRules
+	// below (same normalization and boundary caveats — see that comment):
+	// getConfigDirs() probes ctx.cwd alone, so a session started in a monorepo
+	// subdirectory silently drops the repo root's own commands. The repo root is
+	// the only boundary; no repo → only the current directory speaks for it.
+	// User scope stays native-only (getConfigDirs' user entry), unchanged.
+	const cwd = resolveEquivalentPath(ctx.cwd);
+	const walkBoundary = ctx.repoRoot && pathIsWithin(ctx.repoRoot, cwd) ? resolveEquivalentPath(ctx.repoRoot) : null;
+	const projectBases = walkBoundary ? getAncestorDirs(cwd, walkBoundary) : [{ dir: cwd, depth: 0 }];
+	// Nearest-first order: a subdirectory's command shadows a same-named repo
+	// root command, both in `/` completion dedup and in expansion lookup.
+	const commandDirs: Array<{ dir: string; level: "user" | "project" }> = [
+		...projectBases.flatMap(({ dir }) =>
+			[PATHS.projectDir, ...BRAND_COMPAT_PROJECT_CONFIG_DIRS].map(dirName => ({
+				dir: path.join(dir, dirName, "commands"),
+				level: "project" as const,
+			})),
+		),
+		{ dir: path.join(getAgentDir(), "commands"), level: "user" as const },
+	];
+
+	for (const { dir, level } of commandDirs) {
+		const result = await loadFilesFromDir<SlashCommand>(ctx, dir, PROVIDER_ID, level, {
 			extensions: ["md"],
 			transform: (name, content, path, source) => ({
 				name: name.replace(/\.md$/, ""),
