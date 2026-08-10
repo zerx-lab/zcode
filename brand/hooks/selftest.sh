@@ -6,11 +6,13 @@
 # `with { type: "file" }`，判据一旦少了分号，占位形态每次都会被拒，而且提示的
 # gen:mupdf:reset 写回来的还是同一份注释，用户无从解除。
 set -euo pipefail
-cd "$(git rev-parse --show-toplevel)"
-
-repo_root=$(pwd)
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
 hooks_dir="$repo_root/brand/hooks"
 work=$(mktemp -d)
+fixtures="$work/.fixtures"
+mkdir -p "$fixtures"
+# 探针只读工作区、只写临时 repo，不改任何 checked-in 文件。
 trap 'rm -rf "$work"' EXIT
 
 NATIVE_STUB=packages/natives/native/embedded-addon.js
@@ -61,15 +63,42 @@ probe() {
 	fi
 }
 
-populated_native='import archivePath from "../native/embedded-addons.linux-x64.tar.gz" with { type: "file" };
-export const embeddedAddon = { platformTag: "linux-x64", version: "0.0.0", files: [] };
-'
-populated_mupdf='import wasmPath from "./mupdf-wasm.wasm" with { type: "file" };
-export function loadEmbeddedMupdfWasm(): Uint8Array | undefined { return readFileSync(wasmPath); }
-'
+# populated 夹具从生成器的 generated 模板里现抽 import 行，不留手写快照。
+#
+# 手写快照的问题：上游一改 generated 模板的 import 写法（去分号、拆 with 属性），
+# pre-commit 的 marker 会静默失配（漏报），而手写夹具还是旧写法照样被拒 —— 两个
+# 方向同时假绿。抽模板则夹具跟着上游走：写法一变，夹具就不再命中 marker，
+# `*-populated` 用例立刻从 reject 翻成 accept 报错。
+#
+# 不直接跑 `gen:native` / `gen:mupdf`：那要求探针所在 shell 的 PATH 上有 bun
+# （WSL / 裸 Git Bash 常常没有），拿不到夹具就只能 SKIP，等于在最需要覆盖的
+# 环境里退化成假绿。抽模板零依赖。
+# $1 生成器源文件, $2 夹具落点
+extract_generated_import() {
+	local src=$1 dest=$2 line
+	# 只认模板里顶格的 import 行；占位模板里那句同名注释以 `//` 开头，不会命中。
+	# 故意不要求分号 —— 上游去掉分号时要让夹具照样抽出来，由 probe 报出失配。
+	line=$(sed -n 's/^\(import .*with { type: "file".*\)$/\1/p' "$repo_root/$src" | sed -n 1p)
+	if [[ -z $line ]]; then
+		printf 'FAIL %-38s 无法从 %s 抽出 generated import 行\n' "$(basename "$dest")-fixture" "$src" >&2
+		failures=$((failures + 1))
+		return 0
+	fi
+	# 模板里的 ${JSON.stringify(...)} 插值换成字面路径，其余原样保留。
+	printf '%s\n' "$line" | sed 's/\${[^}]*}/".\/build-artifact"/g' >"$dest"
+}
 
-probe reject native-populated "$NATIVE_STUB" "$populated_native"
-probe reject mupdf-populated "$MUPDF_STUB" "$populated_mupdf"
+extract_generated_import packages/natives/scripts/embed-native.ts "$fixtures/native"
+extract_generated_import packages/coding-agent/scripts/embed-mupdf-wasm.ts "$fixtures/mupdf"
+
+if [[ -s "$fixtures/native" ]]; then
+	probe reject native-populated "$NATIVE_STUB" "$(cat "$fixtures/native")
+export const embeddedAddon = { platformTag: \"linux-x64\", version: \"0.0.0\", files: [] };"
+fi
+if [[ -s "$fixtures/mupdf" ]]; then
+	probe reject mupdf-populated "$MUPDF_STUB" "$(cat "$fixtures/mupdf")
+export function loadEmbeddedMupdfWasm(): Uint8Array | undefined { return readFileSync(wasmPath); }"
+fi
 probe reject stats-populated "$STATS_STUB" "ZmFrZS1iYXNlNjQ="
 probe reject archive-staged "$ARCHIVE" "not a real archive"
 # 回归：占位形态原文（mupdf 那份注释里含不带分号的同一串）必须放行。
