@@ -16,9 +16,12 @@ set -euo pipefail
 fail=0
 note() { printf '%s\n' "$1" >&2; }
 
-# populated 形态的判据：两个占位模块都用 `with { type: "file" }` 引产物；
-# 占位形态不含该导入。比逐字节比对 stub 稳，上游改注释/typedef 不会误报。
-EMBED_MARKER='with { type: "file" }'
+# populated 形态的判据：两个占位模块都用 `with { type: "file" };` 引产物。
+# 分号是必须的：mupdf 占位文件的说明注释里就写着不带分号的同一串
+# （embed-mupdf-wasm.ts 的 placeholder 模板），少了分号会把纯占位形态误判成
+# populated，而且提示的 reset 解不掉。带分号的形式只出现在 generated 模板的
+# import 行（embed-mupdf-wasm.ts:43、embed-native.ts:119）。
+EMBED_MARKER='with { type: "file" };'
 
 while IFS= read -r -d '' file; do
 	case "$file" in
