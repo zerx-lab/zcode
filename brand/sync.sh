@@ -27,7 +27,11 @@ git rebase upstream/main || {
 	exit 1
 }
 
-# 3) release 为派生物：丢弃重建，overlay 永不参与三方合并
+# 3) release 为派生物：丢弃重建，overlay 永不参与三方合并。
+# 全程结束必须回到 zcode —— 停在 release 上的话，之后按 sync-upstream.md 做的
+# changelog / --fixup 提交会落在派生分支上，下次 `git branch -f release zcode`
+# 无声丢掉。失败退出也要回，因为要修的东西都在 zcode。
+trap 'git checkout -q zcode 2>/dev/null || true' EXIT
 git branch -f release zcode
 git checkout release
 if [[ -f brand/apply.ts ]]; then
@@ -48,10 +52,11 @@ bash brand/hooks/selftest.sh
 bun check || {
 	echo "bun check 失败。先做基线差分再改代码，别靠读 diff 猜是不是 fork 引入的：" >&2
 	echo "  bash brand/baseline.sh bun run check:ts" >&2
-	echo "  bash brand/baseline.sh bun run check:rs" >&2
+	echo "  bash brand/baseline.sh --filter '^error' bun run check:rs" >&2
 	exit 1
 }
 
 # 5) 推进漂移基线
 git update-ref refs/brand/last-sync upstream/main
 echo "=== 同步完成: zcode @ $(git rev-parse --short zcode), baseline @ $(git rev-parse --short refs/brand/last-sync) ==="
+echo "（HEAD 已回到 zcode；release 是派生物，别在上面提交）"
