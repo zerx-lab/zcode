@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{DISPLAY_NAME}} — brand banner</title>
+  <!--
+    Overlay 源（见 docs/fork/sync-strategy.md）：`bun brand/apply.ts` 渲染双花括号
+    占位符后落到 assets/banner.html，`bun brand/gen-hero.ts` 用无头 Chromium 把
+    #card 截成 assets/hero.png。
+
+    这里不写死任何品牌色或形状：色值全部来自 brand.ts 的 BRAND_RAMP（经 ramp 占位符
+    插值），字标直接 <img> 引同目录的 icon.svg（= brand/logo/zcode-mark.svg）。
+  -->
+  <style>
+    :root {
+      --ramp-0: {{RAMP_0}};
+      --ramp-1: {{RAMP_1}};
+      --ramp-2: {{RAMP_2}};
+      --ramp-3: {{RAMP_3}};
+      --ramp-4: {{RAMP_4}};
+      --ink: #e8f4fb;
+      --muted: #7f9bb0;
+      --bg: #070d14;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: "SF Mono", "JetBrains Mono", "Cascadia Mono", "DejaVu Sans Mono", monospace;
+    }
+    #card {
+      position: relative;
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      background:
+        radial-gradient(120% 90% at 12% 0%, rgba(61, 199, 255, 0.16) 0%, transparent 55%),
+        radial-gradient(90% 80% at 100% 100%, rgba(26, 104, 166, 0.22) 0%, transparent 60%),
+        var(--bg);
+      color: var(--ink);
+    }
+    /* 底纹网格：给终端产品一点 "编辑器画布" 的质感，不抢字标。 */
+    #card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(125, 200, 235, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(125, 200, 235, 0.06) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(75% 65% at 50% 45%, #000 20%, transparent 100%);
+    }
+    .ramp {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 6px;
+      background: linear-gradient(90deg, var(--ramp-0), var(--ramp-1), var(--ramp-2), var(--ramp-3), var(--ramp-4));
+    }
+    .body {
+      position: relative;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 30px;
+      padding: 0 96px;
+    }
+    .lockup { display: flex; align-items: center; gap: 40px; }
+    /* 字标 SVG 的 path 从 viewBox x=10/120 起笔，左侧自带 ~8.3% 空白；负边距把
+       它拉回与下方文案同一条左基线。 */
+    .lockup img {
+      width: 168px;
+      height: 126px;
+      margin-left: -14px;
+      filter: drop-shadow(0 0 34px rgba(61, 199, 255, 0.42));
+    }
+    .wordmark {
+      font-size: 132px;
+      font-weight: 700;
+      letter-spacing: -0.045em;
+      line-height: 1;
+      background: linear-gradient(105deg, var(--ramp-4), var(--ramp-2) 55%, var(--ramp-1));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .tagline { font-size: 26px; letter-spacing: -0.01em; color: var(--ink); }
+    .tagline em { font-style: normal; color: var(--ramp-2); }
+    .sub { font-size: 16px; color: var(--muted); line-height: 1.65; }
+    /* 安装命令必须一行读完：换行会把 `| sh` 甩到第二块高亮底色里，看起来像被截断。 */
+    .sub code {
+      color: var(--ramp-3);
+      background: rgba(61, 199, 255, 0.09);
+      border: 1px solid rgba(61, 199, 255, 0.22);
+      border-radius: 6px;
+      padding: 5px 12px;
+      white-space: nowrap;
+    }
+    .chips { display: flex; gap: 12px; flex-wrap: wrap; }
+    .chip {
+      font-size: 18px;
+      color: var(--ramp-3);
+      border: 1px solid rgba(61, 199, 255, 0.28);
+      border-radius: 999px;
+      padding: 7px 18px;
+      background: rgba(61, 199, 255, 0.06);
+    }
+    .corner {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      border: 2px solid rgba(61, 199, 255, 0.45);
+    }
+    .tl { top: 30px; left: 30px; border-right: 0; border-bottom: 0; }
+    .tr { top: 30px; right: 30px; border-left: 0; border-bottom: 0; }
+    .bl { bottom: 30px; left: 30px; border-right: 0; border-top: 0; }
+    .br { bottom: 30px; right: 30px; border-left: 0; border-top: 0; }
+  </style>
+</head>
+<body>
+  <div id="card">
+    <div class="ramp"></div>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="body">
+      <div class="lockup">
+        <img src="./icon.svg" alt="{{DISPLAY_NAME}}">
+        <div class="wordmark">{{APP_NAME}}</div>
+      </div>
+      <div class="tagline">A coding agent with the IDE wired in — <em>rebranded fork of oh-my-pi</em></div>
+      <div class="chips">
+        <div class="chip">~/{{CONFIG_DIR_NAME}}</div>
+        <div class="chip">{{DOCS_SCHEME}}://docs</div>
+        <div class="chip">{{ENV_PREFIX}}*</div>
+      </div>
+      <div class="sub">
+        <code>curl -fsSL https://raw.githubusercontent.com/{{REPO}}/{{RELEASE_BRANCH}}/scripts/install.sh | sh</code>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

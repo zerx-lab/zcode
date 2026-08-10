@@ -1,0 +1,233 @@
+# Fork 发布流水线（策略见 docs/fork/sync-strategy.md）。
+#
+# 新文件 = 零 rebase 冲突面。上游 ci.yml 一行不动：它只在 push 到 main / PR 时触发，
+# 且把 `v*` tag 的发布做在 main 的分支推送里，与本工作流的 `zcode-v*` tag 触发互不重叠。
+#
+# 与上游发布的差异（本 fork 只有 GitHub Releases 一条通道）：
+#   - 不发 npm（`@oh-my-pi/*` 包名刻意不改，发布会与上游撞名）；
+#   - 不更新 Homebrew tap，不做 Apple Developer ID 签名/公证（darwin 仍是 ad-hoc 签名）；
+#   - 全部跑 GitHub 托管 runner（上游的 omp-kata 自建池本 fork 没有），
+#     bazel 用 actions/cache 撑的磁盘缓存，首次冷构建慢是预期内的。
+name: zcode release
+
+on:
+   push:
+      tags: ["zcode-v*"]
+   workflow_dispatch:
+      inputs:
+         tag:
+            description: "已存在的 zcode-v* tag（重跑一次构建/发布）"
+            required: true
+            type: string
+
+concurrency:
+   group: zcode-release-${{ inputs.tag || github.ref }}
+   cancel-in-progress: false
+
+permissions:
+   contents: read
+
+env:
+   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+   # 非 darwin 的六个 addon 一次建完。串行 build：addon cdylib 单个链接峰值几个 GiB，
+   # 并发会把 16 GB 的托管 runner 打爆（上游在自建池上也是串行）。
+   natives:
+      name: Native addons (linux + win32)
+      runs-on: ubuntu-22.04
+      steps:
+         - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+           with:
+              ref: ${{ env.RELEASE_TAG }}
+         - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+           with:
+              bun-version: "1.3"
+         - run: bun install --frozen-lockfile
+         - id: cache
+           uses: ./.github/actions/bazel-cache
+           with:
+              scope: zcode-release-linux
+         - name: Build addons
+           run: |
+              set -eo pipefail
+              if [ "$(ulimit -Sn)" != unlimited ] && [ "$(ulimit -Sn)" -lt 65536 ]; then ulimit -Sn 65536 || true; fi
+              for target in \
+                linux-x64-baseline \
+                linux-x64-modern \
+                linux-arm64 \
+                linux-musl-x64-baseline \
+                linux-musl-arm64 \
+                win32-x64-baseline; do
+                bun scripts/bazel-natives.ts "$target" --dest packages/natives/native
+              done
+         - name: Save bazel disk cache
+           if: steps.cache.outputs.save-needed == 'true'
+           uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+           with:
+              path: |
+                 ~/.cache/omp-bazel-disk
+                 ~/.cache/omp-bazel-repo
+              key: ${{ steps.cache.outputs.cache-key }}
+         - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+           with:
+              name: zcode-natives-nondarwin
+              path: packages/natives/native/*.node
+              if-no-files-found: error
+              retention-days: 1
+
+   # bun --compile 交叉编译，所以五个非 darwin 二进制在同一台 x64 runner 上出。
+   binaries_nondarwin:
+      name: Binaries (linux + win32)
+      needs: [natives]
+      runs-on: ubuntu-22.04
+      steps:
+         - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+           with:
+              ref: ${{ env.RELEASE_TAG }}
+         - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+           with:
+              bun-version: "1.3"
+         - run: bun install --frozen-lockfile
+         - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+           with:
+              name: zcode-natives-nondarwin
+              path: packages/natives/native
+         # 品牌门禁跟在 addon 之后：verify 会起源码入口跑 --version，缺 addon 起不来。
+         # tag 指向的树必须是接线完好的补丁栈，而不是 rebase 弄丢接线的中间态。
+         - name: Brand runtime gate
+           run: bun brand/verify.ts
+         - name: Pre-commit hook selftest
+           run: bash brand/hooks/selftest.sh
+         - name: Build release binaries
+           env:
+              RELEASE_TARGETS: linux-x64,linux-arm64,linux-musl-x64,linux-musl-arm64,win32-x64
+           run: bun run ci:release:build-binaries
+         # 只能冒烟本机 ABI：arm64 无 runner，win32 交叉产物靠 bun 的 target 保证，
+         # musl 缺 loader 所以放进 Alpine 容器里跑。
+         - name: Smoke linux-x64
+           run: |
+              runtime_dir="$(mktemp -d)"
+              HOME="$runtime_dir/home" XDG_DATA_HOME="$runtime_dir/xdg" packages/coding-agent/binaries/omp-linux-x64 --version
+              HOME="$runtime_dir/home" XDG_DATA_HOME="$runtime_dir/xdg" packages/coding-agent/binaries/omp-linux-x64 --smoke-test
+         - name: Smoke linux-musl-x64 (alpine)
+           run: |
+              binary="$(realpath packages/coding-agent/binaries/omp-linux-musl-x64)"
+              docker run --rm -v "$binary:/usr/local/bin/zcode:ro" alpine:3.22 sh -ec '
+                apk add --no-cache libstdc++ libgcc >/dev/null
+                runtime_dir="$(mktemp -d)"
+                HOME="$runtime_dir/home" XDG_DATA_HOME="$runtime_dir/xdg" zcode --version
+                HOME="$runtime_dir/home" XDG_DATA_HOME="$runtime_dir/xdg" zcode --smoke-test
+              '
+         - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+           with:
+              name: zcode-binaries-nondarwin
+              path: packages/coding-agent/binaries/omp-*
+              if-no-files-found: error
+              retention-days: 1
+
+   # darwin addon 只能在 darwin runner 上建，所以这条腿自带 bazel 构建。
+   binaries_darwin:
+      name: Binary (${{ matrix.target_id }})
+      strategy:
+         fail-fast: false
+         matrix:
+            include:
+               - { os: macos-14, target_id: darwin-arm64, native_target: darwin-arm64 }
+               - { os: macos-15-intel, target_id: darwin-x64, native_target: darwin-x64-baseline }
+      runs-on: ${{ matrix.os }}
+      steps:
+         - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+           with:
+              ref: ${{ env.RELEASE_TAG }}
+         - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+           with:
+              bun-version: "1.3"
+         - run: bun install --frozen-lockfile
+         - name: Build native addon (bazel)
+           uses: ./.github/actions/bazel-natives
+           with:
+              targets: ${{ matrix.native_target }}
+              cache-scope: zcode-release-${{ matrix.target_id }}
+         - name: Build release binary
+           env:
+              RELEASE_TARGETS: ${{ matrix.target_id }}
+           run: bun run ci:release:build-binaries
+         - name: Smoke binary
+           run: |
+              runtime_dir="$(mktemp -d)"
+              HOME="$runtime_dir/home" XDG_DATA_HOME="$runtime_dir/xdg" packages/coding-agent/binaries/omp-${{ matrix.target_id }} --version
+              HOME="$runtime_dir/home" XDG_DATA_HOME="$runtime_dir/xdg" packages/coding-agent/binaries/omp-${{ matrix.target_id }} --smoke-test
+         - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+           with:
+              name: zcode-binary-${{ matrix.target_id }}
+              path: packages/coding-agent/binaries/omp-${{ matrix.target_id }}
+              if-no-files-found: error
+              retention-days: 1
+
+   publish:
+      name: Publish GitHub release
+      needs: [binaries_nondarwin, binaries_darwin]
+      runs-on: ubuntu-22.04
+      permissions:
+         contents: write
+      steps:
+         - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+           with:
+              ref: ${{ env.RELEASE_TAG }}
+         - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+           with:
+              bun-version: "1.3"
+         - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+           with:
+              pattern: zcode-binar*
+              path: dist
+              merge-multiple: true
+         # 上游的产物名是 omp-*；发布资产按 fork 命名，overlay 后的 install.sh /
+         # install.ps1 正是按 zcode-<platform>-<arch> 取文件的。
+         - name: Rename assets to fork naming
+           run: |
+              set -euo pipefail
+              cd dist
+              for f in omp-*; do mv "$f" "zcode-${f#omp-}"; done
+              chmod +x zcode-linux-* zcode-darwin-*
+              ls -l
+         - name: Generate checksums
+           run: bun run ci:release:checksums dist/SHA256SUMS.txt dist/zcode-*
+         - name: Create release
+           uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+           with:
+              tag_name: ${{ env.RELEASE_TAG }}
+              name: ${{ env.RELEASE_TAG }}
+              files: dist/*
+              generate_release_notes: true
+              body: |
+                 `zcode` 是 [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) 的换品牌二次开发分支，
+                 功能随上游每周 rebase 跟进，本仓只改品牌面与发布通道。
+
+                 ## 安装
+
+                 ```sh
+                 curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/release/scripts/install.sh | sh
+                 ```
+
+                 ```powershell
+                 irm https://raw.githubusercontent.com/${{ github.repository }}/release/scripts/install.ps1 | iex
+                 ```
+
+                 ## 资产
+
+                 | 平台 | 文件 |
+                 |---|---|
+                 | Linux x64 (glibc) | `zcode-linux-x64` |
+                 | Linux arm64 (glibc) | `zcode-linux-arm64` |
+                 | Linux x64 (musl) | `zcode-linux-musl-x64` |
+                 | Linux arm64 (musl) | `zcode-linux-musl-arm64` |
+                 | macOS arm64 | `zcode-darwin-arm64` |
+                 | macOS x64 | `zcode-darwin-x64` |
+                 | Windows x64 | `zcode-windows-x64.exe` |
+
+                 校验和：`SHA256SUMS.txt`（与二进制同一次构建生成）。
+                 macOS 二进制为 ad-hoc 签名（fork 无 Apple Developer ID），首次运行需在
+                 「系统设置 → 隐私与安全性」放行。musl 版动态链接 `libstdc++`/`libgcc`：
+                 Alpine 上先 `apk add libstdc++ libgcc`。
