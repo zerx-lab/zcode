@@ -153,7 +153,9 @@ brand/
 
 判据取「populated 形态特有的 import 行」而非逐字节比对 stub，上游改注释/typedef 不会误报。**分号是判据的一部分**：mupdf 占位文件自己的说明注释里就写着不带分号的 `` `with { type: "file" }` ``（`embed-mupdf-wasm.ts` 的 placeholder 模板原文），少一个分号就会把纯占位形态判成 populated，而且提示的 `gen:mupdf:reset` 写回来的还是同一份注释，用户无从解除。
 
-`brand/hooks/selftest.sh` 是这条判据的探针，8 个用例覆盖两个方向（4 个 populated 必拒 + 4 个占位/无关必放行），占位形态直接从工作区取原文，因此跟着上游 stub 文案走。改判据后必跑。
+`brand/hooks/selftest.sh` 是这条判据的探针，8 个用例覆盖两个方向（4 个 populated 必拒 + 4 个占位/无关必放行）。**两侧夹具都不写死**：占位形态取工作区原文，populated 形态从生成器的 generated 模板里现抽 import 行（`embed-native.ts` / `embed-mupdf-wasm.ts`，`${...}` 插值换成字面路径）。上游一改模板写法，marker 会静默失配而夹具跟着变 —— `*-populated` 用例立刻从 reject 翻成 accept 报错，不会两个方向一起假绿（实测：把 generated 模板的分号去掉，探针精确报 `FAIL mupdf-populated want=reject got=accept`）。
+
+不直接跑 `gen:*` 取夹具：那要求探针所在 shell 的 PATH 上有 `bun`，WSL / 裸 Git Bash 常常没有（本机 WSL 就没有），拿不到夹具只能 SKIP，等于在最需要覆盖的环境退化成假绿。抽模板零依赖、不改工作区。改判据后必跑。
 
 侧产物用 `.gitignore` 兜底：`packages/natives/native/.gitignore`（新文件，零冲突）补上 `embedded-addons.*.tar.gz`。这是上游遗漏（同类的 `*.node` 与 `src/utils/mupdf-wasm.wasm` 上游都已 ignore），可 PR 回上游。
 
