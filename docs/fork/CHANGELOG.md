@@ -7,7 +7,7 @@
 ### Added
 
 - zcode 品牌字标：终端块字符版 `packages/coding-agent/src/modes/components/brand-logo.ts`（`ZCODE_LOGO`，12×5，仅用 `█ ▀ ▄` 以保证 setup splash 2x 放大不发虚）；SVG 版 `brand/logo/zcode-mark.svg`（品牌渐变）与 `brand/logo/zcode-mark-mono.svg`（深底单色）。
-- `brand/hooks/pre-commit`：提交门禁，拦截被中断的 binary build 留下的 populated 构建占位文件（`embedded-addon.js` / `mupdf-wasm-embed.ts` / `embedded-client.generated.txt`）与 `embedded-addons.*.tar.gz`。`brand/sync.sh` 幂等安装 `core.hooksPath`。rebase / cherry-pick 重放不触发，不干扰上游同步。
+- `brand/hooks/pre-commit`：提交门禁，拦截被中断的 binary build 留下的 populated 构建占位文件（`embedded-addon.js` / `mupdf-wasm-embed.ts` / `embedded-client.generated.txt`）与 `embedded-addons.*.tar.gz`。判据是带分号的 `with { type: "file" };` —— mupdf 占位文件的注释里含不带分号的同一串，少分号会把纯占位形态误判成 populated 且无法通过 reset 解除。`brand/hooks/selftest.sh` 是双向探针（4 拒 + 4 放行），已接入 `brand/sync.sh` 门禁。`brand/sync.sh` 幂等安装 `core.hooksPath`；cherry-pick / rebase / 有冲突后的 `rebase --continue` 均实测不触发，不干扰上游同步。
 - `packages/natives/native/.gitignore`（新文件，零冲突）：补上上游遗漏的 `embedded-addons.*.tar.gz` ignore 规则。
 
 ### Changed

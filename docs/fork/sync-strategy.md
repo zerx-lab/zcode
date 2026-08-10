@@ -146,18 +146,20 @@ brand/
 
 | 受保护路径 | 占位形态 | populated 判据 |
 |---|---|---|
-| `packages/natives/native/embedded-addon.js` | `embeddedAddon = null` | 含 `with { type: "file" }` |
-| `packages/coding-agent/src/utils/mupdf-wasm-embed.ts` | `return undefined` | 含 `with { type: "file" }` |
+| `packages/natives/native/embedded-addon.js` | `embeddedAddon = null` | 含 `with { type: "file" };` |
+| `packages/coding-agent/src/utils/mupdf-wasm-embed.ts` | `return undefined` | 含 `with { type: "file" };` |
 | `packages/stats/src/embedded-client.generated.txt` | 空文件 | 非零字节 |
 | `packages/natives/native/embedded-addons.*.tar.gz` | 不该存在 | 被 staged 即拒绝 |
 
-判据取「populated 形态特有的 import」而非逐字节比对 stub —— 上游改注释/typedef 不会误报。
+判据取「populated 形态特有的 import 行」而非逐字节比对 stub，上游改注释/typedef 不会误报。**分号是判据的一部分**：mupdf 占位文件自己的说明注释里就写着不带分号的 `` `with { type: "file" }` ``（`embed-mupdf-wasm.ts` 的 placeholder 模板原文），少一个分号就会把纯占位形态判成 populated，而且提示的 `gen:mupdf:reset` 写回来的还是同一份注释，用户无从解除。
+
+`brand/hooks/selftest.sh` 是这条判据的探针，8 个用例覆盖两个方向（4 个 populated 必拒 + 4 个占位/无关必放行），占位形态直接从工作区取原文，因此跟着上游 stub 文案走。改判据后必跑。
 
 侧产物用 `.gitignore` 兜底：`packages/natives/native/.gitignore`（新文件，零冲突）补上 `embedded-addons.*.tar.gz`。这是上游遗漏（同类的 `*.node` 与 `src/utils/mupdf-wasm.wasm` 上游都已 ignore），可 PR 回上游。
 
 **为什么这条门禁必要**：populated 的 `embedded-addon.js` 会让 `loader-state.js` 的 `detectCompiledBinary()` 在开发态返回 `true`（该函数以 embedded-addon 是否为 null 作为编译态的权威判据），`resolveLoaderCandidates()` 于是把 `~/.zcode/natives/<version>` 排在 `nativeDir` **之前** —— 陈旧的已发布 `.node` 静默抢在本地新构建之前被加载，且 `shouldStageNodeModulesAddon()` 会跳过 Windows 的 node_modules 暂存路径。已实际发生过一次（同时夹带 27 MB tar.gz 进历史）。
 
-rebase / cherry-pick 重放不触发 `pre-commit`（已实测），因此门禁不干扰上游同步；确需绕过用 `git commit --no-verify`。
+重放路径实测（git 2.54.0）：`cherry-pick`、无冲突 `rebase`、**以及有冲突后的 `rebase --continue`**，三者都不触发 `pre-commit`（最后一条单独造了冲突验证：populated 占位文件被原样重放，退出码 0）。门禁因此不干扰 `bash brand/sync.sh`；确需手工绕过用 `git commit --no-verify`。
 
 ### `brand/verify.ts` 运行时门禁
 
