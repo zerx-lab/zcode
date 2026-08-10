@@ -1,5 +1,6 @@
 /** `task` — spawn subagents: batch shape, streamed progress, per-agent results. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { AgentLink, Badge, Note, Output, ResultText, Row } from "../parts";
 import type { ToolRenderer, ToolRenderHost, ToolRenderProps } from "../types";
 import { detailsRecord, isRecord, normalizeWs, num, str, truncate } from "../util";
@@ -64,6 +65,7 @@ function resultStatus(res: Record<string, unknown>): { label: string; tone: "ok"
 }
 
 function Summary({ args }: ToolRenderProps): ReactNode {
+	const { tf } = useI18n();
 	const agent = str(args.agent);
 	const resume = str(args.resume);
 	const tasks = taskItems(args);
@@ -72,15 +74,16 @@ function Summary({ args }: ToolRenderProps): ReactNode {
 	return (
 		<>
 			{agent && <Badge tone="accent">{agent}</Badge>}
-			{!agent && resume && <Badge>resume {resume}</Badge>}
+			{!agent && resume && <Badge>{tf("resume {0}", resume)}</Badge>}
 			{label && <span className="tv-muted">{truncate(normalizeWs(label), 72)}</span>}
-			{tasks.length > 1 && <Badge>{tasks.length} tasks</Badge>}
+			{tasks.length > 1 && <Badge>{tf("{0} tasks", tasks.length)}</Badge>}
 		</>
 	);
 }
 
 /** Final snapshot for one agent: status row, output preview, error/abort notes. */
 function AgentResult({ res, host }: { res: Record<string, unknown>; host?: ToolRenderHost }): ReactNode {
+	const { t, tf } = useI18n();
 	const { label, tone } = resultStatus(res);
 	const id = str(res.id) ?? "agent";
 	const description = str(res.description);
@@ -88,7 +91,7 @@ function AgentResult({ res, host }: { res: Record<string, unknown>; host?: ToolR
 	const tokens = num(res.tokens);
 	if (tokens) stats.push(`${fmtCount(tokens)} tok`);
 	const requests = num(res.requests);
-	if (requests) stats.push(`${requests} req`);
+	if (requests) stats.push(tf("{0} req", requests));
 	const durationMs = num(res.durationMs);
 	if (durationMs != null) stats.push(fmtDuration(durationMs));
 	const model = str(res.resolvedModel);
@@ -118,7 +121,8 @@ function AgentResult({ res, host }: { res: Record<string, unknown>; host?: ToolR
 					</AgentLink>
 				}
 			>
-				<Badge tone={tone}>{label}</Badge> {res.truncated === true && <Badge tone="warn">truncated</Badge>}{" "}
+				<Badge tone={tone}>{t(label)}</Badge>{" "}
+				{res.truncated === true && <Badge tone="warn">{t("truncated")}</Badge>}{" "}
 				{description && <span>{truncate(normalizeWs(description), 96)}</span>}{" "}
 				{stats.length > 0 && <span className="tv-faint">{stats.join(" · ")}</span>}
 			</Row>
@@ -126,14 +130,15 @@ function AgentResult({ res, host }: { res: Record<string, unknown>; host?: ToolR
 			{aborted && abortReason && <Note tone="err">{abortReason}</Note>}
 			{output.trim() !== "" && <Output text={output} maxLines={6} error={tone === "err"} />}
 			{error && !aborted && error !== abortReason && <Note tone={tone === "warn" ? "warn" : "err"}>{error}</Note>}
-			{patchPath && <div className="tv-faint">patch: {patchPath}</div>}
-			{!patchPath && branchName && <div className="tv-faint">branch: {branchName}</div>}
+			{patchPath && <div className="tv-faint">{tf("patch: {0}", patchPath)}</div>}
+			{!patchPath && branchName && <div className="tv-faint">{tf("branch: {0}", branchName)}</div>}
 		</>
 	);
 }
 
 /** Live (still-running) snapshot for one agent. */
 function AgentProgressRow({ p, host }: { p: Record<string, unknown>; host?: ToolRenderHost }): ReactNode {
+	const { t, tf } = useI18n();
 	const status = str(p.status) ?? "running";
 	const tone =
 		status === "completed"
@@ -148,7 +153,7 @@ function AgentProgressRow({ p, host }: { p: Record<string, unknown>; host?: Tool
 	const intent = str(p.lastIntent) ?? str(p.currentTool);
 	const bits: string[] = [];
 	const toolCount = num(p.toolCount);
-	if (toolCount) bits.push(`${toolCount} tools`);
+	if (toolCount) bits.push(tf("{0} tools", toolCount));
 	const tokens = num(p.tokens);
 	if (tokens) bits.push(`${fmtCount(tokens)} tok`);
 	const durationMs = num(p.durationMs);
@@ -161,7 +166,7 @@ function AgentProgressRow({ p, host }: { p: Record<string, unknown>; host?: Tool
 				</AgentLink>
 			}
 		>
-			<Badge tone={tone}>{status}</Badge> {description && <span>{truncate(normalizeWs(description), 96)}</span>}{" "}
+			<Badge tone={tone}>{t(status)}</Badge> {description && <span>{truncate(normalizeWs(description), 96)}</span>}{" "}
 			{intent && <span className="tv-muted">{truncate(normalizeWs(intent), 64)}</span>}{" "}
 			{bits.length > 0 && <span className="tv-faint">{bits.join(" · ")}</span>}
 		</Row>
@@ -169,6 +174,7 @@ function AgentProgressRow({ p, host }: { p: Record<string, unknown>; host?: Tool
 }
 
 function Body({ args, result, host }: ToolRenderProps): ReactNode {
+	const { t, tf } = useI18n();
 	const resume = str(args.resume);
 	const context = str(args.context);
 	const tasks = taskItems(args);
@@ -194,10 +200,10 @@ function Body({ args, result, host }: ToolRenderProps): ReactNode {
 		const total = details ? num(details.totalDurationMs) : null;
 		footer = (
 			<Row>
-				{ok > 0 && <Badge tone="ok">{ok} succeeded</Badge>}{" "}
-				{mergeFailed > 0 && <Badge tone="warn">{mergeFailed} merge failed</Badge>}{" "}
-				{failed > 0 && <Badge tone="err">{failed} failed</Badge>}{" "}
-				{aborted > 0 && <Badge tone="err">{aborted} aborted</Badge>}{" "}
+				{ok > 0 && <Badge tone="ok">{tf("{0} succeeded", ok)}</Badge>}{" "}
+				{mergeFailed > 0 && <Badge tone="warn">{tf("{0} merge failed", mergeFailed)}</Badge>}{" "}
+				{failed > 0 && <Badge tone="err">{tf("{0} failed", failed)}</Badge>}{" "}
+				{aborted > 0 && <Badge tone="err">{tf("{0} aborted", aborted)}</Badge>}{" "}
 				{total != null && <span className="tv-faint">{fmtDuration(total)}</span>}
 			</Row>
 		);
@@ -210,27 +216,27 @@ function Body({ args, result, host }: ToolRenderProps): ReactNode {
 
 	return (
 		<>
-			{resume && <Badge>resume {resume}</Badge>}
-			{context && <Output text={context} maxLines={4} title="context" />}
+			{resume && <Badge>{tf("resume {0}", resume)}</Badge>}
+			{context && <Output text={context} maxLines={4} title={t("context")} />}
 			{tasks.length > 0 && (
 				<div className="tv-list">
-					{tasks.map((t, i) => (
-						<div key={t.id ?? i}>
+					{tasks.map((item, i) => (
+						<div key={item.id ?? i}>
 							<Row
 								k={
-									t.id ? (
-										<AgentLink id={t.id} host={host}>
-											{taskIdLabel(t.id)}
+									item.id ? (
+										<AgentLink id={item.id} host={host}>
+											{taskIdLabel(item.id)}
 										</AgentLink>
 									) : (
 										<Badge tone="accent">{`#${i + 1}`}</Badge>
 									)
 								}
 							>
-								{t.isolated && <Badge>isolated</Badge>}{" "}
-								{t.description && <span>{truncate(normalizeWs(t.description), 120)}</span>}
+								{item.isolated && <Badge>{t("isolated")}</Badge>}{" "}
+								{item.description && <span>{truncate(normalizeWs(item.description), 120)}</span>}
 							</Row>
-							{t.assignment && <Output text={t.assignment} maxLines={6} title="assignment" />}
+							{item.assignment && <Output text={item.assignment} maxLines={6} title={t("assignment")} />}
 						</div>
 					))}
 				</div>

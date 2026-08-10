@@ -1,7 +1,9 @@
 import { LogOut, PanelRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import type { GuestSnapshot } from "../../lib/client";
 import { fmtPercent, shortenPath } from "../../lib/format";
+import { LangToggle } from "./LangToggle";
 import { ThemeToggle } from "./ThemeToggle";
 
 export interface HeaderBarProps {
@@ -13,6 +15,7 @@ export interface HeaderBarProps {
 }
 
 export function HeaderBar({ snapshot, subCount, railOpen, onToggleRail, onLeave }: HeaderBarProps): ReactNode {
+	const { t, tf } = useI18n();
 	const { header, state, phase, readOnly } = snapshot;
 	const title = header?.title ?? state?.sessionName ?? "session";
 	const usage = state?.contextUsage;
@@ -39,8 +42,8 @@ export function HeaderBar({ snapshot, subCount, railOpen, onToggleRail, onLeave 
 			</div>
 			<div className="sh-header-right">
 				{readOnly && (
-					<span className="sh-chip" title="you joined with a read-only link — watching only">
-						read-only
+					<span className="sh-chip" title={t("you joined with a read-only link — watching only")}>
+						{t("read-only")}
 					</span>
 				)}
 				{state?.model && <span className="sh-chip sh-chip-meta">{state.model.name}</span>}
@@ -48,7 +51,7 @@ export function HeaderBar({ snapshot, subCount, railOpen, onToggleRail, onLeave 
 				{pct != null && (
 					<span
 						className={pct > 80 ? "sh-gauge sh-gauge-warn" : "sh-gauge"}
-						title={`context · ${fmtPercent(pct)}`}
+						title={tf("context · {0}", fmtPercent(pct))}
 					>
 						<span className="sh-gauge-track">
 							<span className="sh-gauge-fill" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
@@ -62,25 +65,26 @@ export function HeaderBar({ snapshot, subCount, railOpen, onToggleRail, onLeave 
 							<span
 								key={`${p.name}:${i}`}
 								className={p.role === "host" ? "sh-avatar sh-avatar-host" : "sh-avatar"}
-								title={`${p.name} · ${p.role}${p.readOnly ? " · view-only" : ""}`}
+								title={`${tf("{0} · {1}", p.name, t(p.role))}${p.readOnly ? ` · ${t("view-only")}` : ""}`}
 							>
 								{(p.name[0] ?? "?").toUpperCase()}
 							</span>
 						))}
 					</span>
 				)}
-				<span className={`sh-dot sh-dot-${phase}`} title={phase} />
+				<span className={`sh-dot sh-dot-${phase}`} title={t(phase)} />
+				<LangToggle />
 				<ThemeToggle />
 				<button
 					type="button"
 					className={railOpen ? "sh-btn sh-btn-icon sh-btn-on" : "sh-btn sh-btn-icon"}
 					onClick={onToggleRail}
-					title={railOpen ? "hide agents" : "show agents"}
+					title={railOpen ? t("hide agents") : t("show agents")}
 				>
 					<PanelRight size={14} />
 					{subCount > 0 && <span className="sh-badge">{subCount}</span>}
 				</button>
-				<button type="button" className="sh-btn sh-btn-icon" onClick={onLeave} title="leave session">
+				<button type="button" className="sh-btn sh-btn-icon" onClick={onLeave} title={t("leave session")}>
 					<LogOut size={14} />
 				</button>
 			</div>

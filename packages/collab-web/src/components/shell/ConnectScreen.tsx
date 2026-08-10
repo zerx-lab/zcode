@@ -1,5 +1,8 @@
+import { BRAND_DISPLAY_NAME, BRAND_MARK } from "@oh-my-pi/pi-utils/brand-consts";
 import type { FormEvent, ReactNode } from "react";
 import { useState } from "react";
+import { useI18n } from "../../i18n";
+import { LangToggle } from "./LangToggle";
 import { ThemeToggle } from "./ThemeToggle";
 
 export interface ConnectScreenProps {
@@ -9,6 +12,7 @@ export interface ConnectScreenProps {
 }
 
 export function ConnectScreen({ defaultName, error, onConnect }: ConnectScreenProps): ReactNode {
+	const { t, tf } = useI18n();
 	const [link, setLink] = useState("");
 	const [name, setName] = useState(defaultName);
 	const [localError, setLocalError] = useState<string | null>(null);
@@ -17,7 +21,7 @@ export function ConnectScreen({ defaultName, error, onConnect }: ConnectScreenPr
 		e.preventDefault();
 		const trimmed = link.trim();
 		if (!trimmed) {
-			setLocalError("paste a join link first");
+			setLocalError(t("paste a join link first"));
 			return;
 		}
 		setLocalError(null);
@@ -32,13 +36,16 @@ export function ConnectScreen({ defaultName, error, onConnect }: ConnectScreenPr
 				<div className="sh-connect-head">
 					<div className="sh-lockup">
 						<span className="sh-lockup-mark" aria-hidden="true" />
-						<span className="sh-lockup-pi">π</span> omp collab
+						<span className="sh-lockup-pi">{BRAND_MARK}</span> {BRAND_DISPLAY_NAME} collab
 					</div>
-					<ThemeToggle />
+					<div className="sh-connect-toggles">
+						<LangToggle />
+						<ThemeToggle />
+					</div>
 				</div>
-				<div className="sh-connect-sub">live agent session, in your browser</div>
+				<div className="sh-connect-sub">{t("live agent session, in your browser")}</div>
 				<label className="sh-field">
-					<span className="sh-field-label">join link</span>
+					<span className="sh-field-label">{t("join link")}</span>
 					<input
 						className="sh-input sh-input-mono"
 						type="text"
@@ -49,10 +56,12 @@ export function ConnectScreen({ defaultName, error, onConnect }: ConnectScreenPr
 						autoComplete="off"
 						autoFocus
 					/>
-					<span className="sh-field-hint">paste a /collab link from any omp session</span>
+					<span className="sh-field-hint">
+						{tf("paste a /collab link from any {0} session", BRAND_DISPLAY_NAME)}
+					</span>
 				</label>
 				<label className="sh-field">
-					<span className="sh-field-label">display name</span>
+					<span className="sh-field-label">{t("display name")}</span>
 					<input
 						className="sh-input"
 						type="text"
@@ -66,7 +75,7 @@ export function ConnectScreen({ defaultName, error, onConnect }: ConnectScreenPr
 				</label>
 				{shown && <div className="sh-connect-error">{shown}</div>}
 				<button className="sh-btn sh-btn-primary sh-connect-submit" type="submit">
-					Connect
+					{t("Connect")}
 				</button>
 			</form>
 		</div>

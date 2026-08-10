@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- Simplified Chinese UI locale with `LangToggle` (auto/en/zh-CN) and English-key fallback dictionaries for chrome and tool renderers
+
+### Changed
+- Rebranded visitor client to zcode with blue accent `#1677ff`, brand-const wordmark, and regenerated favicon/OG assets
 ## [17.2.10] - 2026-08-06
 
 ### Changed

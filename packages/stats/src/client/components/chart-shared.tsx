@@ -5,16 +5,18 @@
  * behavior series.
  */
 
+import { BRAND_RAMP } from "@oh-my-pi/pi-utils/brand-consts";
 import { format } from "@oh-my-pi/pi-utils/dates";
+import { t } from "../i18n";
 
-// OMP brand palette (packages/collab-web/src/styles/tokens.css): pink/purple/cyan.
-// Categorical series lead with the brand gradient hues (pink -> purple -> cyan).
+// zcode palette: blue slots derive from brand-consts BRAND_RAMP (单一色值真源)。
+// Categorical series lead with the brand gradient hues (pink -> brand blue -> cyan).
 export const MODEL_COLORS = [
 	"#ed4abf", // brand pink (accent)
-	"#9b4dff", // brand violet
+	BRAND_RAMP[1], // brand azure #2396d6
 	"#5ad8e6", // brand cyan
 	"#62d394", // green
-	"#c77dff", // light purple
+	BRAND_RAMP[3], // light blue #7ad9ff
 	"#ff8fd1", // light pink
 	"#f5c14b", // amber
 	"#ff6b7d", // rose
@@ -22,22 +24,22 @@ export const MODEL_COLORS = [
 
 export const CHART_THEMES = {
 	dark: {
-		legendLabel: "#a89fb3",
-		tooltipBackground: "#241a2e",
-		tooltipTitle: "#eae5ef",
-		tooltipBody: "#a89fb3",
+		legendLabel: "#9fa8b3",
+		tooltipBackground: "#1a222e",
+		tooltipTitle: "#e5eaef",
+		tooltipBody: "#9fa8b3",
 		tooltipBorder: "rgba(255, 255, 255, 0.12)",
 		grid: "rgba(255, 255, 255, 0.06)",
-		tick: "#867a93",
+		tick: "#7a8693",
 	},
 	light: {
-		legendLabel: "#5a5462",
+		legendLabel: "#545b62",
 		tooltipBackground: "#ffffff",
-		tooltipTitle: "#241a2e",
-		tooltipBody: "#5a5462",
-		tooltipBorder: "rgba(20, 12, 28, 0.15)",
-		grid: "rgba(20, 12, 28, 0.08)",
-		tick: "#6a6275",
+		tooltipTitle: "#1a222e",
+		tooltipBody: "#545b62",
+		tooltipBorder: "rgba(12, 20, 28, 0.15)",
+		grid: "rgba(12, 20, 28, 0.08)",
+		tick: "#626b75",
 	},
 } as const;
 
@@ -230,13 +232,14 @@ export function buildTopNByModelSeries<T extends ModelKeyedPoint, B>(
 	const allDays = [...new Set(points.map(p => p.timestamp))].sort((a, b) => a - b);
 	const seriesNames = topEntries.map(([key]) => labelByKey.get(key) ?? key);
 	const hasOther = points.some(p => !topKeys.has(`${p.model}::${p.provider}`));
-	if (hasOther) seriesNames.push("Other");
+	const otherLabel = t("Other");
+	if (hasOther) seriesNames.push(otherLabel);
 
 	const dayMap = new Map<number, Record<string, B>>();
 	for (const day of allDays) dayMap.set(day, {});
 	for (const point of points) {
 		const key = `${point.model}::${point.provider}`;
-		const label = topKeys.has(key) ? (labelByKey.get(key) ?? point.model) : "Other";
+		const label = topKeys.has(key) ? (labelByKey.get(key) ?? point.model) : otherLabel;
 		const row = dayMap.get(point.timestamp);
 		if (!row) continue;
 		const bucket = row[label] ?? initBucket();

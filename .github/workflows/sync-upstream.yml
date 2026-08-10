@@ -1,0 +1,110 @@
+# Fork 自动同步：每天拉取 upstream/main，rebase 补丁栈 zcode 并强推。
+# 冲突或 bun check 失败时不推送，让 run 失败并邮件通知，本地按 brand/sync.sh 手工处理。
+# 注意：schedule 只从默认分支读取本文件，fork 默认分支须设为 zcode。
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "0 22 * * *" # 北京时间每天早上 6 点
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: zcode
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        id: fetch
+        run: |
+          git remote add upstream https://github.com/can1357/oh-my-pi.git
+          git fetch upstream --no-tags
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "已包含 upstream/main，跳过"
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+            echo "上游新增 $(git rev-list --count HEAD..upstream/main) 个提交"
+          fi
+
+      # rerere 种子：本地 brand/sync.sh 解完冲突后会把 .git/rr-cache 推到
+      # refs/brand/rr-cache；这里拉下来种入，已知冲突即可自动重放。
+      - name: Seed rerere cache
+        if: steps.fetch.outputs.up_to_date == 'false'
+        run: |
+          if git fetch origin +refs/brand/rr-cache:refs/brand/rr-cache 2>/dev/null; then
+            mkdir -p .git/rr-cache
+            GIT_INDEX_FILE=.git/rr-seed-index git --work-tree=.git/rr-cache checkout refs/brand/rr-cache -- .
+            rm -f .git/rr-seed-index
+            echo "已种入 $(git ls-tree -r --name-only refs/brand/rr-cache | wc -l) 个 rerere 条目"
+          else
+            echo "(origin 尚无 refs/brand/rr-cache，跳过)"
+          fi
+
+      - name: Rebase zcode onto upstream/main
+        if: steps.fetch.outputs.up_to_date == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config rerere.enabled true
+          git config rerere.autoupdate true
+          if ! git rebase upstream/main; then
+            # rerere 可能已自动解掉全部冲突；带进度守卫地推进，
+            # REBASE_HEAD 不前进（未知冲突 / hook 或提交创建反复失败）即放弃
+            prev=""
+            while git rev-parse -q --verify REBASE_HEAD >/dev/null; do
+              if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "::error::存在 rerere 未覆盖的冲突，请本地运行 bash brand/sync.sh 手工解决"
+                git rebase --abort
+                exit 1
+              fi
+              cur=$(git rev-parse REBASE_HEAD)
+              if [ "$cur" = "$prev" ]; then
+                echo "::error::rebase --continue 无进展（非冲突失败），中止"
+                git rebase --abort
+                exit 1
+              fi
+              prev=$cur
+              GIT_EDITOR=true git rebase --continue || true
+            done
+          fi
+          # 终态断言：rebase 状态已清空且 HEAD 确实基于 upstream/main
+          if [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ]; then
+            echo "::error::rebase 状态残留，中止"
+            git rebase --abort
+            exit 1
+          fi
+          git merge-base --is-ancestor upstream/main HEAD || {
+            echo "::error::rebase 后 HEAD 不包含 upstream/main，中止"
+            exit 1
+          }
+
+      - name: Setup Bun
+        if: steps.fetch.outputs.up_to_date == 'false'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Gate (bun check:ts)
+        if: steps.fetch.outputs.up_to_date == 'false'
+        run: |
+          bun install --frozen-lockfile
+          bun run check:ts
+
+      - name: Push zcode
+        if: steps.fetch.outputs.up_to_date == 'false'
+        run: git push --force-with-lease=zcode origin zcode
+
+      # main 只是上游镜像，更新失败不阻断核心目标（zcode 同步）
+      - name: Mirror main (best-effort)
+        if: steps.fetch.outputs.up_to_date == 'false'
+        continue-on-error: true
+        run: git push origin upstream/main:refs/heads/main

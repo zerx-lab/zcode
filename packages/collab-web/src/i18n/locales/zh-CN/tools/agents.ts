@@ -1,0 +1,101 @@
+import type { Dict } from "../../../types";
+
+/** `task`, `job`, `hub`, `irc`, `goal`, `todo`, `yield`, `ask`, `resolve` tool renderers. */
+export const toolAgents: Dict = {
+	// task.tsx
+	"resume {0}": "恢复 {0}",
+	"{0} tasks": "{0} 个任务",
+	aborted: "已中止",
+	"merge failed": "合并失败",
+	done: "完成",
+	failed: "失败",
+	completed: "已完成",
+	running: "运行中",
+	truncated: "已截断",
+	"{0} req": "{0} 次请求",
+	"{0} tools": "{0} 次工具调用",
+	context: "上下文",
+	isolated: "隔离",
+	assignment: "任务说明",
+	"{0} succeeded": "{0} 个成功",
+	"{0} merge failed": "{0} 个合并失败",
+	"{0} failed": "{0} 个失败",
+	"{0} aborted": "{0} 个已中止",
+	"patch: {0}": "补丁：{0}",
+	"branch: {0}": "分支：{0}",
+
+	// job.tsx
+	list: "列出",
+	poll: "轮询",
+	cancel: "取消",
+	"all running jobs": "所有运行中的任务",
+	"all jobs": "全部任务",
+	"(no label)": "（无标签）",
+	"waiting on {0}": "等待 {0} 个",
+	"waiting on {0} of {1}": "等待 {1} 个中的 {0} 个",
+	"{0} done": "{0} 个完成",
+	"{0} cancelled": "{0} 个已取消",
+	snapshot: "快照",
+	"not found": "未找到",
+	"already completed": "已经完成",
+	cancelled: "已取消",
+
+	// irc.tsx
+	empty: "空",
+	"{0} messages": "{0} 条消息",
+	"{0} peers": "{0} 个对端",
+	"{0} unread": "{0} 条未读",
+	"timed out": "已超时",
+	"No reply yet — they may answer later; check inbox or wait again.":
+		"暂无回复——对方可能稍后回复，可查看收件箱或再次等待。",
+	"to {0}": "发给 {0}",
+	"from {0}": "来自 {0}",
+	broadcast: "广播",
+	"await reply": "等待回复",
+	reply: "回复",
+	peek: "查看",
+	"{0} · of {1}": "{0} · 属于 {1}",
+	woken: "已唤醒",
+	revived: "已恢复",
+	injected: "已注入",
+	idle: "空闲",
+	parked: "已挂起",
+
+	// goal.tsx
+	set: "设置",
+	check: "查看",
+	complete: "完成",
+	resume: "恢复",
+	drop: "放弃",
+	"budget-limited": "预算超限",
+	paused: "已暂停",
+	dropped: "已放弃",
+	"budget {0}": "预算 {0}",
+	op: "操作",
+	status: "状态",
+	objective: "目标",
+	budget: "预算",
+	elapsed: "耗时",
+	"no active goal": "无活跃目标",
+	Report: "报告",
+	left: "剩余",
+
+	// todo.tsx
+	"{0} items": "{0} 项",
+	"{0} phases · {1} tasks": "{0} 个阶段 · {1} 个任务",
+
+	// ask.tsx
+	multi: "多选",
+	recommended: "推荐",
+	"no selection": "未选择",
+	"auto-selected after timeout — not a user choice": "超时后自动选择——非用户选择",
+
+	// resolve.tsx
+	apply: "应用",
+	discard: "丢弃",
+	propose: "提议",
+	"proposed → resolved": "已提议 → 已应用",
+	"proposed → rejected": "已提议 → 已拒绝",
+	"plan proposed": "方案已提议",
+	plan: "方案",
+};

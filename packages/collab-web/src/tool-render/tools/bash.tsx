@@ -1,5 +1,6 @@
 /** `bash` — shell command execution: prompt line with env prefix, badges, output tail. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badge, Badges, InvalidArg, ResultImages, ResultText, Row } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, display, isRecord, normalizeWs, num, resultTextOf, shortenPath, str, truncate } from "../util";
@@ -38,6 +39,7 @@ function Summary({ args, result }: ToolRenderProps): ReactNode {
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { tf } = useI18n();
 	const command = args.command === undefined ? "…" : str(args.command);
 	const prefix = isRecord(args.env) ? envPrefix(args.env) : "";
 	const cwd = str(args.cwd);
@@ -54,13 +56,15 @@ function Body({ args, result }: ToolRenderProps): ReactNode {
 
 	const stats: string[] = [];
 	if (wallTimeMs !== null) {
-		stats.push(wallTimeMs < 1000 ? `wall ${Math.round(wallTimeMs)}ms` : `wall ${(wallTimeMs / 1000).toFixed(1)}s`);
+		stats.push(
+			wallTimeMs < 1000 ? tf("wall {0}ms", Math.round(wallTimeMs)) : tf("wall {0}s", (wallTimeMs / 1000).toFixed(1)),
+		);
 	}
 	if (requestedTimeoutSeconds !== null && requestedTimeoutSeconds !== timeoutSeconds) {
-		stats.push(`requested timeout ${requestedTimeoutSeconds}s clamped`);
+		stats.push(tf("requested timeout {0}s clamped", requestedTimeoutSeconds));
 	}
-	if (job?.jobId) stats.push(`job ${job.jobId}`);
-	if (artifactId) stats.push(`artifact ${artifactId}`);
+	if (job?.jobId) stats.push(tf("job {0}", job.jobId));
+	if (artifactId) stats.push(tf("artifact {0}", artifactId));
 
 	return (
 		<>
@@ -79,7 +83,7 @@ function Body({ args, result }: ToolRenderProps): ReactNode {
 					!job && args.async === true && <Badge tone="accent">async</Badge>,
 					head !== null && <Badge>head={head}</Badge>,
 					tail !== null && <Badge>tail={tail}</Badge>,
-					exitCode !== null && <Badge tone="err">exit {exitCode}</Badge>,
+					exitCode !== null && <Badge tone="err">{tf("exit {0}", exitCode)}</Badge>,
 					job && (
 						<Badge tone={job.state === "failed" ? "err" : job.state === "running" ? "accent" : "ok"}>
 							async {job.state}

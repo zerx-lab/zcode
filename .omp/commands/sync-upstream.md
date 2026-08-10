@@ -4,7 +4,7 @@
 
 策略真相源是 `docs/fork/sync-strategy.md`，低冲突开发铁律在 `.omp/rules/fork-low-conflict.md`。本文件只管**这次同步怎么走**。
 
-节奏：每周一次。一周 ~950 commits 批量解一次，rerere 命中率高；每天同步只是把同样的冲突拆成七份。
+节奏：CI（`.github/workflows/sync-upstream.yml`）每天自动 rebase 并推送 rerere 可覆盖的部分；本命令在 **CI 失败（新冲突/门禁红）或每周例行完整同步**时人工执行。
 
 ## 1. 跑脚本
 
@@ -12,7 +12,7 @@
 bash brand/sync.sh
 ```
 
-它按顺序做：安装 `core.hooksPath` → fetch → 漂移审查 → `git rebase upstream/main` → 重建 `release` → `brand/hooks/selftest.sh` → `bun check` → 全绿才推进 `refs/brand/last-sync`。
+它按顺序做：安装 `core.hooksPath` + 启用 rerere → fetch → 漂移审查 → `git rebase upstream/main` → 重建 `release` → `brand/hooks/selftest.sh` → `bun check` → 全绿才推进 `refs/brand/last-sync`，并把 `.git/rr-cache` 快照推到 `origin` 的 `refs/brand/rr-cache`（CI 靠它自动重放你解过的冲突——所以**解完冲突务必让脚本跑到全绿**，否则解法不会发布，CI 明天还会在同一处失败）。
 
 脚本中途会切到派生分支 `release` 做 overlay，但**退出时（含失败退出）一定把 HEAD 送回 `zcode`**。后面所有步骤都默认你在 `zcode` 上；万一发现自己在 `release`，先 `git checkout zcode` 再动手 —— 落在 `release` 上的提交会被下次 `git branch -f release zcode` 无声丢掉。
 

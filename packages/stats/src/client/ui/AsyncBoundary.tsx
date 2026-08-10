@@ -1,4 +1,5 @@
 import type React from "react";
+import { t } from "../i18n";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
 import { Skeleton } from "./Skeleton";
@@ -19,7 +20,7 @@ export function AsyncBoundary({
 	error,
 	data,
 	empty = false,
-	emptyText = "No data available",
+	emptyText = t("No data available"),
 	fallback,
 	onRetry,
 	children,

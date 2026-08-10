@@ -1,5 +1,6 @@
 /** `lsp` — language-server queries: diagnostics, definitions, references, hover, rename, … */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import type { Tone } from "../parts";
 import { Badge, InvalidArg, Kv, KvGrid, Output, PathText, ResultText, Row } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
@@ -70,7 +71,15 @@ function ArgKv({ k, raw, val }: { k: string; raw: unknown; val: ReactNode }): Re
 	return <Kv k={k}>{val == null || val === false ? <InvalidArg what={k} /> : val}</Kv>;
 }
 
-function DiagnosticRows({ text, rows }: { text: string; rows: DiagRow[] }): ReactNode {
+function DiagnosticRows({
+	text,
+	rows,
+	tf,
+}: {
+	text: string;
+	rows: DiagRow[];
+	tf: (en: string, ...args: readonly (string | number)[]) => string;
+}): ReactNode {
 	const errMatch = text.match(/(\d+)\s+error\(s\)/);
 	const warnMatch = text.match(/(\d+)\s+warning\(s\)/);
 	const shown = rows.slice(0, MAX_ROWS);
@@ -78,16 +87,8 @@ function DiagnosticRows({ text, rows }: { text: string; rows: DiagRow[] }): Reac
 		<>
 			{(errMatch || warnMatch) && (
 				<span className="tv-badges">
-					{errMatch && (
-						<Badge tone="err">
-							{errMatch[1]} error{errMatch[1] === "1" ? "" : "s"}
-						</Badge>
-					)}
-					{warnMatch && (
-						<Badge tone="warn">
-							{warnMatch[1]} warning{warnMatch[1] === "1" ? "" : "s"}
-						</Badge>
-					)}
+					{errMatch && <Badge tone="err">{tf("{0} errors", errMatch[1])}</Badge>}
+					{warnMatch && <Badge tone="warn">{tf("{0} warnings", warnMatch[1])}</Badge>}
 				</span>
 			)}
 			<div className="tv-list">
@@ -99,7 +100,7 @@ function DiagnosticRows({ text, rows }: { text: string; rows: DiagRow[] }): Reac
 				))}
 				{rows.length > shown.length && (
 					<Row>
-						<span className="tv-faint">… {rows.length - shown.length} more</span>
+						<span className="tv-faint">{tf("… {0} more", rows.length - shown.length)}</span>
 					</Row>
 				)}
 			</div>
@@ -107,16 +108,22 @@ function DiagnosticRows({ text, rows }: { text: string; rows: DiagRow[] }): Reac
 	);
 }
 
-function LocationRows({ text, rows }: { text: string; rows: LocRow[] }): ReactNode {
+function LocationRows({
+	text,
+	rows,
+	tf,
+}: {
+	text: string;
+	rows: LocRow[];
+	tf: (en: string, ...args: readonly (string | number)[]) => string;
+}): ReactNode {
 	const refMatch = text.match(/(\d+)\s+reference\(s\)/);
 	const shown = rows.slice(0, MAX_ROWS);
 	return (
 		<>
 			{refMatch && (
 				<span className="tv-badges">
-					<Badge tone="accent">
-						{refMatch[1]} reference{refMatch[1] === "1" ? "" : "s"}
-					</Badge>
+					<Badge tone="accent">{tf("{0} references", refMatch[1])}</Badge>
 				</span>
 			)}
 			<div className="tv-list">
@@ -127,7 +134,7 @@ function LocationRows({ text, rows }: { text: string; rows: LocRow[] }): ReactNo
 				))}
 				{rows.length > shown.length && (
 					<Row>
-						<span className="tv-faint">… {rows.length - shown.length} more</span>
+						<span className="tv-faint">{tf("… {0} more", rows.length - shown.length)}</span>
 					</Row>
 				)}
 			</div>
@@ -136,6 +143,7 @@ function LocationRows({ text, rows }: { text: string; rows: LocRow[] }): ReactNo
 }
 
 function Summary({ args }: ToolRenderProps): ReactNode {
+	const { t, tf } = useI18n();
 	const action = str(args.action);
 	const file = str(args.file);
 	const line = num(args.line);
@@ -144,10 +152,10 @@ function Summary({ args }: ToolRenderProps): ReactNode {
 	const newName = str(args.new_name);
 	return (
 		<>
-			<Badge tone="accent">{action ? action.replace(/_/g, " ") : "request"}</Badge>
-			{file === "*" && <Badge>workspace</Badge>}
+			<Badge tone="accent">{action ? action.replace(/_/g, " ") : t("request")}</Badge>
+			{file === "*" && <Badge>{t("workspace")}</Badge>}
 			{file && file !== "*" && <PathText path={file} from={line} />}
-			{!file && line != null && <span className="tv-faint">line {line}</span>}
+			{!file && line != null && <span className="tv-faint">{tf("line {0}", line)}</span>}
 			{symbol && <span className="tv-pattern">{truncate(normalizeWs(symbol), 48)}</span>}
 			{query && <span className="tv-muted">{truncate(normalizeWs(query), 48)}</span>}
 			{newName && <span className="tv-muted">→ {truncate(normalizeWs(newName), 48)}</span>}
@@ -156,6 +164,7 @@ function Summary({ args }: ToolRenderProps): ReactNode {
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { t, tf } = useI18n();
 	const details = detailsRecord(result);
 	const file = str(args.file);
 	const line = num(args.line);
@@ -182,26 +191,26 @@ function Body({ args, result }: ToolRenderProps): ReactNode {
 				<ArgKv
 					k="file"
 					raw={args.file}
-					val={file === "*" ? <Badge>workspace</Badge> : file && <PathText path={file} from={line} />}
+					val={file === "*" ? <Badge>{t("workspace")}</Badge> : file && <PathText path={file} from={line} />}
 				/>
 				{!file && <ArgKv k="line" raw={args.line} val={line} />}
 				<ArgKv k="symbol" raw={args.symbol} val={symbol && truncate(normalizeWs(symbol), 120)} />
 				<ArgKv k="query" raw={args.query} val={query && truncate(normalizeWs(query), 120)} />
 				<ArgKv k="new name" raw={args.new_name} val={newName && truncate(normalizeWs(newName), 120)} />
-				<ArgKv k="apply" raw={args.apply} val={apply == null ? null : apply ? "yes" : "no"} />
+				<ArgKv k="apply" raw={args.apply} val={apply == null ? null : apply ? t("yes") : t("no")} />
 				<ArgKv k="timeout" raw={args.timeout} val={timeout != null && `${timeout}s`} />
 				{args.payload !== undefined && payload == null && (
 					<Kv k="payload">
 						<InvalidArg what="payload" />
 					</Kv>
 				)}
-				{serverName && <Kv k="server">{serverName}</Kv>}
+				{serverName && <Kv k={t("server")}>{serverName}</Kv>}
 			</KvGrid>
 			{payload && <Output text={payload} lang="json" variant="code" maxLines={8} title="payload" />}
 			{diags.length > 0 ? (
-				<DiagnosticRows text={text} rows={diags} />
+				<DiagnosticRows text={text} rows={diags} tf={tf} />
 			) : locs.length > 0 ? (
-				<LocationRows text={text} rows={locs} />
+				<LocationRows text={text} rows={locs} tf={tf} />
 			) : (
 				<ResultText result={result} maxLines={12} />
 			)}

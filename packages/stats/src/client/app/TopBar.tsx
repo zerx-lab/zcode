@@ -1,5 +1,7 @@
 import { Menu } from "lucide-react";
+import { t, tf } from "../i18n";
 import type { TimeRange } from "../types";
+import { LanguageToggle } from "./LanguageToggle";
 import { RangeControl } from "./RangeControl";
 import type { DashboardSection } from "./routes";
 import { routes } from "./routes";
@@ -28,12 +30,12 @@ export function TopBar({
 	className = "",
 }: TopBarProps) {
 	const currentRoute = routes.find(r => r.id === activeSection);
-	const title = currentRoute?.label || "Observability";
+	const title = t(currentRoute?.label || "Observability");
 
 	const formatLastUpdated = (time: number | null) => {
-		if (!time) return "Not updated";
+		if (!time) return t("Not updated");
 		const date = new Date(time);
-		return `Updated ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+		return tf("Updated {0}", date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
 	};
 
 	return (
@@ -44,7 +46,7 @@ export function TopBar({
 						type="button"
 						onClick={onMenuToggle}
 						className="stats-mobile-menu-btn"
-						aria-label="Open navigation menu"
+						aria-label={t("Open navigation menu")}
 					>
 						<Menu size={20} />
 					</button>
@@ -64,6 +66,7 @@ export function TopBar({
 
 				<RangeControl value={range} onChange={onRangeChange} />
 
+				<LanguageToggle />
 				<ThemeToggle />
 
 				<SyncButton onSyncStart={onSyncStart} onSyncComplete={onSyncComplete} />

@@ -1,4 +1,5 @@
 import { type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
+import { t, tf } from "../i18n";
 import { type ThemePreference, useThemePreference } from "../useSystemTheme";
 
 const NEXT_PREFERENCE: Record<ThemePreference, ThemePreference> = {
@@ -22,14 +23,15 @@ const PREFERENCE_LABEL: Record<ThemePreference, string> = {
 export function ThemeToggle() {
 	const { preference, setPreference } = useThemePreference();
 	const Icon = PREFERENCE_ICON[preference];
+	const label = t(PREFERENCE_LABEL[preference]);
 
 	return (
 		<button
 			type="button"
 			className="stats-theme-toggle"
 			onClick={() => setPreference(NEXT_PREFERENCE[preference])}
-			aria-label={`${PREFERENCE_LABEL[preference]} (click to switch)`}
-			title={`${PREFERENCE_LABEL[preference]} — click to switch`}
+			aria-label={tf("{0} (click to switch)", label)}
+			title={tf("{0} — click to switch", label)}
 		>
 			<Icon size={16} />
 		</button>

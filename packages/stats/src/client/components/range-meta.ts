@@ -5,6 +5,7 @@
  */
 
 import { format } from "@oh-my-pi/pi-utils/dates";
+import { t } from "../i18n";
 import type { TimeRange } from "../types";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -64,7 +65,8 @@ const RANGE_META: Record<TimeRange, RangeMeta> = {
 };
 
 export function rangeMeta(range: TimeRange): RangeMeta {
-	return RANGE_META[range];
+	const meta = RANGE_META[range];
+	return { ...meta, windowLabel: t(meta.windowLabel), trendLabel: t(meta.trendLabel) };
 }
 
 /** Format a bucket timestamp using the active range's tick format. */

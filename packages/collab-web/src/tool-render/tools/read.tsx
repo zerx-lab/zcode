@@ -1,5 +1,6 @@
 /** `read` — file/URL/archive reads: path + selector summary, highlighted content, image thumbnails. */
 import type { ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { Badge, Badges, Kv, KvGrid, PathText, ResultImages, ResultText } from "../parts";
 import type { ToolRenderer, ToolRenderProps } from "../types";
 import { detailsRecord, isRecord, languageFromPath, num, shortenPath, str } from "../util";
@@ -67,30 +68,27 @@ function Summary(props: ToolRenderProps): ReactNode {
 }
 
 function Body({ args, result }: ToolRenderProps): ReactNode {
+	const { t, tf } = useI18n();
 	const { path } = readArgs(args);
 	const d = readDetails(detailsRecord(result));
 	const conflictBadge = d.conflictCount !== null && d.conflictCount > 0 && (
-		<Badge tone="warn">
-			{d.conflictCount} conflict{d.conflictCount === 1 ? "" : "s"}
-		</Badge>
+		<Badge tone="warn">{tf("{0} conflicts", d.conflictCount)}</Badge>
 	);
 	const elidedBadge = d.elidedSpans !== null && d.elidedSpans > 0 && (
-		<Badge>
-			{d.elidedSpans} elided span{d.elidedSpans === 1 ? "" : "s"}
-		</Badge>
+		<Badge>{tf("{0} elided spans", d.elidedSpans)}</Badge>
 	);
-	const truncatedBadge = d.truncated && <Badge tone="warn">truncated</Badge>;
+	const truncatedBadge = d.truncated && <Badge tone="warn">{t("truncated")}</Badge>;
 	const resolved = d.suffixTo ?? d.resolvedPath;
 	return (
 		<>
 			{(resolved !== null || d.suffixFrom !== null) && (
 				<KvGrid>
 					{resolved !== null && (
-						<Kv k="resolved">
+						<Kv k={t("resolved")}>
 							<PathText path={resolved} />
 						</Kv>
 					)}
-					{d.suffixFrom !== null && <Kv k="corrected from">{shortenPath(d.suffixFrom)}</Kv>}
+					{d.suffixFrom !== null && <Kv k={t("corrected from")}>{shortenPath(d.suffixFrom)}</Kv>}
 				</KvGrid>
 			)}
 			<Badges items={[conflictBadge, elidedBadge, truncatedBadge]} />

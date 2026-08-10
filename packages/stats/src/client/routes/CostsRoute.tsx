@@ -16,6 +16,7 @@ import {
 import { formatCost } from "../data/formatters";
 import { useResource } from "../data/useResource";
 import { buildCostSummary } from "../data/view-models";
+import { t, tf } from "../i18n";
 import type { CostTimeSeriesPoint, TimeRange } from "../types";
 import { AsyncBoundary, Panel, SegmentedControl } from "../ui";
 import { useSystemTheme } from "../useSystemTheme";
@@ -54,10 +55,10 @@ function CostOverviewPanel({ costSeries }: { costSeries: CostTimeSeriesPoint[] }
 	const summary = useMemo(() => buildCostSummary(costSeries), [costSeries]);
 
 	const cards = [
-		{ label: "Total Cost", value: formatCost(summary.totalCost) },
-		{ label: "Average / Day", value: formatCost(summary.avgDailyCost) },
+		{ label: t("Total Cost"), value: formatCost(summary.totalCost) },
+		{ label: t("Average / Day"), value: formatCost(summary.avgDailyCost) },
 		{
-			label: "Top Model",
+			label: t("Top Model"),
 			value: summary.topModelName || "—",
 			sub: summary.topModelName ? formatCost(summary.topModelCost) : undefined,
 		},
@@ -71,7 +72,9 @@ function CostOverviewPanel({ costSeries }: { costSeries: CostTimeSeriesPoint[] }
 					<p className="text-2xl font-bold stats-text-primary truncate" title={card.value}>
 						{card.value}
 					</p>
-					{card.sub && <p className="text-xs stats-text-muted mt-1 font-medium">Total spent: {card.sub}</p>}
+					{card.sub && (
+						<p className="text-xs stats-text-muted mt-1 font-medium">{tf("Total spent: {0}", card.sub)}</p>
+					)}
 				</Panel>
 			))}
 		</div>
@@ -130,7 +133,7 @@ function CostTrendPanel({ costSeries }: { costSeries: CostTimeSeriesPoint[] }) {
 				bucketToValue: bucket => bucket.total,
 			});
 		}
-		return buildAggregateTimeSeries<CostTimeSeriesPoint, { total: number }>(costSeries, "Cost", {
+		return buildAggregateTimeSeries<CostTimeSeriesPoint, { total: number }>(costSeries, t("Cost"), {
 			initBucket: () => ({ total: 0 }),
 			accumulate: (bucket, point) => {
 				bucket.total += point.cost;
@@ -143,12 +146,12 @@ function CostTrendPanel({ costSeries }: { costSeries: CostTimeSeriesPoint[] }) {
 		return buildSharedPlugins({
 			chartTheme,
 			showLegend: byModel,
-			defaultLabel: "Cost",
+			defaultLabel: t("Cost"),
 			formatValue: v => `$${v.toFixed(2)}`,
 			footer: items => {
 				if (!byModel || items.length < 2) return undefined;
 				const total = items.reduce((sum, item) => sum + (item.parsed.y ?? 0), 0);
-				return `Total: $${total.toFixed(2)}`;
+				return tf("Total: {0}", `$${total.toFixed(2)}`);
 			},
 		});
 	}, [chartTheme, byModel]);
@@ -208,20 +211,20 @@ function CostTrendPanel({ costSeries }: { costSeries: CostTimeSeriesPoint[] }) {
 	}, [sharedPlugins, sharedScaleBase, yScale]);
 
 	const toggleOptions = [
-		{ value: false, label: "All Models" },
-		{ value: true, label: "By Model" },
+		{ value: false, label: t("All Models") },
+		{ value: true, label: t("By Model") },
 	];
 
 	return (
 		<Panel
-			title="Daily Cost"
-			subtitle="API spending over time"
+			title={t("Daily Cost")}
+			subtitle={t("API spending over time")}
 			actions={<SegmentedControl options={toggleOptions} value={byModel} onChange={setByModel} />}
 		>
 			<div className="h-[300px]">
 				{chartData.labels.length === 0 ? (
 					<div className="h-full flex items-center justify-center text-stats-muted text-sm">
-						No cost data available
+						{t("No cost data available")}
 					</div>
 				) : byModel && lineData ? (
 					<Line data={lineData} options={lineOptions} />
