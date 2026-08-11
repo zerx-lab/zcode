@@ -15,7 +15,7 @@ describe("runUpdateCommand fetch cancellation", () => {
 		const fetchStub = Object.assign(
 			async (_input: FetchInput, init?: FetchInit) => {
 				requestSignal = init?.signal ?? undefined;
-				return Response.json({ version: "999.0.0" });
+				return Response.json({ tag_name: "zcode-v999.0.0-z1" });
 			},
 			{ preconnect: globalThis.fetch.preconnect },
 		);

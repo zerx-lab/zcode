@@ -24,7 +24,8 @@ import {
 	updateViaBinaryAt,
 } from "@oh-my-pi/pi-coding-agent/cli/update-cli";
 import Update from "@oh-my-pi/pi-coding-agent/commands/update";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { APP_NAME, removeWithRetries } from "@oh-my-pi/pi-utils";
+import { BRAND_REPO } from "@oh-my-pi/pi-utils/brand";
 import type { CliConfig } from "@oh-my-pi/pi-utils/cli";
 
 const tempDirs: string[] = [];
@@ -220,13 +221,13 @@ describe("update-cli install target detection", () => {
 
 describe("update-cli package manager commands", () => {
 	it("targets the Homebrew tap formula and switches to reinstall for forced updates", () => {
-		expect(buildHomebrewUpdateArgs(false)).toEqual(["upgrade", "can1357/tap/omp"]);
-		expect(buildHomebrewUpdateArgs(true)).toEqual(["reinstall", "can1357/tap/omp"]);
+		expect(buildHomebrewUpdateArgs(false)).toEqual(["upgrade", `${BRAND_REPO.split("/")[0]}/tap/${APP_NAME}`]);
+		expect(buildHomebrewUpdateArgs(true)).toEqual(["reinstall", `${BRAND_REPO.split("/")[0]}/tap/${APP_NAME}`]);
 	});
 
 	it("targets the mise GitHub backend tool and force-reinstalls the checked version when requested", () => {
-		expect(buildMiseUpgradeArgs()).toEqual(["upgrade", "github:can1357/oh-my-pi", "--bump"]);
-		expect(buildMiseForceInstallArgs("15.10.5")).toEqual(["install", "--force", "github:can1357/oh-my-pi@15.10.5"]);
+		expect(buildMiseUpgradeArgs()).toEqual(["upgrade", `github:${BRAND_REPO}`, "--bump"]);
+		expect(buildMiseForceInstallArgs("15.10.5")).toEqual(["install", "--force", `github:${BRAND_REPO}@15.10.5`]);
 	});
 
 	it("pins npm package installs to the official registry and the checked native package versions", () => {
@@ -409,7 +410,7 @@ describe("update-cli bun cache pruning", () => {
 describe("update-cli release binary integrity", () => {
 	const tag = "v17.1.2";
 	const binaryName = "omp-linux-x64";
-	const url = `https://github.com/can1357/oh-my-pi/releases/download/${tag}/${binaryName}`;
+	const url = `https://github.com/${BRAND_REPO}/releases/download/${tag}/${binaryName}`;
 	const content = "verified binary";
 	const digest = `sha256:${createHash("sha256").update(content).digest("hex")}`;
 
@@ -647,7 +648,7 @@ describe("update-cli binary replacement", () => {
 				expectedVersion: "15.1.8",
 				verifyInstalledVersion: async () => ({ ok: false, path: targetPath }),
 			}),
-		).rejects.toThrow("restored previous omp binary");
+		).rejects.toThrow(`restored previous ${APP_NAME} binary`);
 
 		expect(await Bun.file(targetPath).text()).toBe("old binary");
 		expect(await Bun.file(tempPath).exists()).toBe(false);

@@ -89,7 +89,7 @@ bash brand/sync.sh
 | `packages/utils/src/logger.ts` | 61, 62, 214, 219 | 日志文件名/正则硬编码 `omp.`（未走 APP_NAME） |
 | `packages/utils/src/env.ts` | ~186-191 | 已有 `OMP_*→PI_*` 镜像循环，复制 3 行加新前缀（`OMP_` 保留兼容） |
 | `packages/coding-agent/src/cli/commands/init-xdg.ts` | 5 | 本地重复 `APP_NAME="omp"`，改 import |
-| `packages/coding-agent/src/cli/update-cli.ts` | 19-22 | `REPO` / `PACKAGE` / `HOMEBREW_FORMULA` / `MISE_TOOL` |
+| `packages/coding-agent/src/cli/update-cli.ts` | 20-25, ~150, ~1090, ~1130-1175 | `REPO` / `PACKAGE` / `HOMEBREW_FORMULA` / `MISE_TOOL`；fork 发布通道接线（import `update-fork-release.ts`、`releaseTag` 贯穿资产查找、`runUpdateCommand` 的发现/比较/通道门禁） |
 | `packages/coding-agent/src/modes/components/welcome.ts` | 12, 454 | `PI_LOGO` 改为取自 `brand-logo.ts`（1 行 import + 1 行赋值） |
 | `packages/coding-agent/src/modes/setup-wizard/scenes/splash.ts` | ~192 | 硬编码 `"O h   M y   P i"` |
 | `packages/ai/src/utils/openrouter-headers.ts` | 5-7 | User-Agent / X-Title / Referer |
@@ -275,7 +275,7 @@ tag 打在 `zcode` 上（不是 `release`）：二进制内容与 overlay 无关
 - [x] `zcode` 分支（补丁栈，原名 `fork`）= upstream/main (ab78d3091) + `82436b0e9`（Windows native build 修复，原 `fix/windows-native-build`）
 - [x] `refs/brand/last-sync` = ab78d3091
 - [x] 本文档 + `brand/sync.sh`
-- [x] `brand.ts` + 内联替换补丁 —— 品牌值：产品/二进制 `zcode`、配置目录 `~/.zcode`、scheme `zcode://`（`omp://` 隐藏别名）、env 前缀 `ZCODE_`（`OMP_` 保留）、仓库 `zerx-lab/oh-my-pi`
+- [x] `brand.ts` + 内联替换补丁 —— 品牌值：产品/二进制 `zcode`、配置目录 `~/.zcode`、scheme `zcode://`（`omp://` 隐藏别名）、env 前缀 `ZCODE_`（`OMP_` 保留）、仓库 `zerx-lab/zcode`
 - [x] AI 低冲突开发规约：`.omp/rules/fork-low-conflict.md`（alwaysApply；zcode 经 compat 发现，无镜像）
 - [x] `.omp` compat 发现：`BRAND_COMPAT_PROJECT_CONFIG_DIRS` 接入 config.ts / discovery / watchdog；`agents unpack --project` 写路径改 `CONFIG_DIR_NAME`
 - [x] logo 更换：`brand-logo.ts`（终端字标 Heavy Z）+ `welcome.ts` 2 行接线；SVG 定稿在 `brand/logo/`
