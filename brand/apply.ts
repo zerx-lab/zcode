@@ -2,9 +2,17 @@
 /**
  * Overlay 渲染器（策略见 `docs/fork/sync-strategy.md`）。
  *
- * Overlay = "落在上游已有路径上、内容 100% 由本 fork 决定" 的产物。它们**不进
- * 补丁栈**：`brand/sync.sh` 每次同步都 `git branch -f release zcode` 重建
- * `release`，再跑本脚本重新生成 —— 结构上不可能参与三方合并，也就不可能冲突。
+ * Overlay = "落在上游已有路径上、内容 100% 由本 fork 决定" 的产物，按归属分两档：
+ *
+ * - `stack`：**补丁栈上就必须是渲染态**。目前只有根 `README.md` —— 默认分支是
+ *   zcode，GitHub 首页与一行流安装说明都从它读，等到 `release` 才品牌化就晚了。
+ *   代价是它进补丁栈、参与 rebase：`.gitattributes` 把它挂到 `zcode-readme`
+ *   merge driver（`brand/merge-readme.sh`）上，冲突固定解成「用 `brand/README.md`
+ *   重渲染」，上游 README 的内容永不并入。
+ * - `release`：只存在于派生分支 `release`。`brand/sync.sh` 每次同步都
+ *   `git branch -f release zcode` 重建再重新生成 —— 结构上不可能参与三方合并。
+ *   它们在补丁栈上必须**缺席**：混进去会让发布门禁红（zcode-v17.2.12-z3 就是
+ *   这么挂的），所以写盘和审计都按当前分支分档。
  *
  * 三种生成方式：
  * - `copy`：整文件由 fork 拥有（icon/hero），直接落盘；
@@ -15,8 +23,9 @@
  *   改进自动跟随，只有锚点消失才需要人工介入。
  *
  * 用法：
- *   bun brand/apply.ts            # 写盘
- *   bun brand/apply.ts --check    # 只比对，有漂移则退出码 1（CI / verify 用）
+ *   bun brand/apply.ts                  # 按当前分支写盘（补丁栈上只写 stack 档）
+ *   bun brand/apply.ts --check          # 审计期望态，不符则退出码 1（CI / verify 用）
+ *   bun brand/apply.ts --render <目标>  # 单个目标渲染到 stdout（README merge driver 用）
  */
 import * as path from "node:path";
 import {
@@ -67,10 +76,14 @@ interface RewriteRule {
 	min?: number;
 }
 
-type Entry =
+/** 目标归属；语义见文件头。 */
+export type Scope = "stack" | "release";
+
+type Entry = { scope: Scope } & (
 	| { kind: "copy"; from: string; to: string }
 	| { kind: "render"; from: string; to: string }
-	| { kind: "rewrite"; to: string; rules: RewriteRule[] };
+	| { kind: "rewrite"; to: string; rules: RewriteRule[] }
+);
 
 /**
  * install 脚本的共同改写：仓库、一行流分支、资产/命令名。
@@ -107,11 +120,13 @@ const NO_SOURCE_NOTE = `${BRAND_APP_NAME} installs prebuilt binaries only: @oh-m
 const NO_SOURCE_HINT = "Re-run without the source flag for the binary, or clone the repo and run 'bun run setup'.";
 
 const MANIFEST: Entry[] = [
-	{ kind: "copy", from: "brand/logo/zcode-mark.svg", to: "assets/icon.svg" },
-	{ kind: "copy", from: "brand/assets/hero.png", to: "assets/hero.png" },
-	{ kind: "render", from: "brand/assets/banner.html", to: "assets/banner.html" },
-	{ kind: "render", from: "brand/README.md", to: "README.md" },
+	{ scope: "release", kind: "copy", from: "brand/logo/zcode-mark.svg", to: "assets/icon.svg" },
+	{ scope: "release", kind: "copy", from: "brand/assets/hero.png", to: "assets/hero.png" },
+	{ scope: "release", kind: "render", from: "brand/assets/banner.html", to: "assets/banner.html" },
+	// 唯一的 stack 档：改它等于改补丁栈，不是改派生物。
+	{ scope: "stack", kind: "render", from: "brand/README.md", to: "README.md" },
 	{
+		scope: "release",
 		kind: "rewrite",
 		to: "scripts/install.sh",
 		rules: installScriptRules([
@@ -137,6 +152,7 @@ const MANIFEST: Entry[] = [
 		]),
 	},
 	{
+		scope: "release",
 		kind: "rewrite",
 		to: "scripts/install.ps1",
 		rules: installScriptRules([
@@ -218,29 +234,108 @@ async function sameOnDisk(target: string, bytes: Uint8Array): Promise<boolean> {
 	}
 }
 
-async function main(): Promise<void> {
-	const checkOnly = process.argv.includes("--check");
-	const drifted: string[] = [];
+/** 当前检出的分支名；detached HEAD（CI 按 tag checkout）返回空串，按补丁栈处理。 */
+function currentBranch(): string {
+	const proc = Bun.spawnSync(["git", "branch", "--show-current"], { cwd: repoRoot });
+	return proc.success ? proc.stdout.toString().trim() : "";
+}
 
+/** 某一档里，磁盘内容与渲染产物逐字节一致的 / 不一致的目标。 */
+async function statusOf(scope: Scope): Promise<{ applied: string[]; missing: string[] }> {
+	const applied: string[] = [];
+	const missing: string[] = [];
 	for (const entry of MANIFEST) {
+		if (entry.scope !== scope) continue;
 		const { to, bytes } = await produce(entry);
-		if (await sameOnDisk(to, bytes)) continue;
-		drifted.push(entry.to);
-		if (!checkOnly) await Bun.write(to, bytes);
+		((await sameOnDisk(to, bytes)) ? applied : missing).push(entry.to);
+	}
+	return { applied, missing };
+}
+
+/**
+ * 按当前分支判定**期望态**并审计。三条断言，两个分支上都有意义：
+ *
+ * - 任何分支：`stack` 档必须全部是渲染态 —— 这就是 README 的唯一性门禁，
+ *   rebase 把上游 README 并进来会立刻红。
+ * - `release`：`release` 档也必须全部应用。
+ * - 其余分支：`release` 档必须全部缺席，出现一个就是产物误入补丁栈。
+ *
+ * 旧实现靠「README 里有没有 `BRAND_REPO`」嗅探分支，README 进补丁栈后这条嗅探
+ * 恒真，于是把 `release` 档也拿到 zcode 上校验 —— zcode-v17.2.12-z3 的发布门禁
+ * 就是这么红的。分支 + 分档判定不依赖任何文件内容启发式。
+ */
+export async function auditOverlay(): Promise<{ ok: boolean; detail: string }> {
+	let stack: { applied: string[]; missing: string[] };
+	let release: { applied: string[]; missing: string[] };
+	try {
+		stack = await statusOf("stack");
+		release = await statusOf("release");
+	} catch (err) {
+		// rewrite 锚点消失时 produce 会抛：这本身就是要人工裁决的门禁失败。
+		return { ok: false, detail: err instanceof Error ? err.message : String(err) };
 	}
 
-	if (checkOnly) {
-		if (drifted.length > 0) {
-			console.error(`overlay 未应用或已漂移:\n  ${drifted.join("\n  ")}\n运行 \`bun brand/apply.ts\``);
-			process.exit(1);
-		}
-		console.log(`overlay 已是最新 (${MANIFEST.length} 个目标)`);
+	if (stack.missing.length > 0) {
+		return {
+			ok: false,
+			detail:
+				`fork 独占文件未渲染或已漂移: ${stack.missing.join(", ")} —— 跑 \`bun brand/apply.ts\`。` +
+				`README 的真源是 brand/README.md，永远重渲染，不与上游三方合并。`,
+		};
+	}
+	if (currentBranch() === RELEASE_BRANCH) {
+		return release.missing.length > 0
+			? { ok: false, detail: `release overlay 未应用或已漂移: ${release.missing.join(", ")} —— 跑 \`bun brand/apply.ts\`` }
+			: { ok: true, detail: `release 树：${stack.applied.length + release.applied.length} 个目标一致` };
+	}
+	return release.applied.length > 0
+		? {
+				ok: false,
+				detail:
+					`release 产物混入补丁栈: ${release.applied.join(", ")} —— ` +
+					`这些只属于 release 分支，用 \`git checkout upstream/main -- <路径>\` 还原`,
+			}
+		: {
+				ok: true,
+				detail: `补丁栈树：stack ${stack.applied.length} 个一致，release ${release.missing.length} 个按预期缺席`,
+			};
+}
+
+async function main(): Promise<void> {
+	const renderAt = process.argv.indexOf("--render");
+	if (renderAt >= 0) {
+		const target = process.argv[renderAt + 1];
+		const entry = MANIFEST.find(e => e.to === target);
+		if (!entry) throw new Error(`--render: 未知 overlay 目标 ${target ?? "(缺参数)"}`);
+		if (entry.kind === "rewrite") throw new Error(`--render 不支持 rewrite 目标 ${target}：它以磁盘上的上游文件为输入`);
+		process.stdout.write((await produce(entry)).bytes);
 		return;
 	}
+
+	if (process.argv.includes("--check")) {
+		const audit = await auditOverlay();
+		if (!audit.ok) {
+			console.error(audit.detail);
+			process.exit(1);
+		}
+		console.log(audit.detail);
+		return;
+	}
+
+	// 写盘只覆盖当前分支该有的档：在 zcode 上误跑不会再把 release 产物撒进补丁栈。
+	const scopes: Scope[] = currentBranch() === RELEASE_BRANCH ? ["stack", "release"] : ["stack"];
+	const written: string[] = [];
+	for (const entry of MANIFEST) {
+		if (!scopes.includes(entry.scope)) continue;
+		const { to, bytes } = await produce(entry);
+		if (await sameOnDisk(to, bytes)) continue;
+		written.push(entry.to);
+		await Bun.write(to, bytes);
+	}
 	console.log(
-		drifted.length === 0
-			? `overlay 无变化 (${MANIFEST.length} 个目标)`
-			: `overlay 已写入:\n  ${drifted.join("\n  ")}`,
+		written.length === 0
+			? `overlay 无变化 (${scopes.join("+")} 档)`
+			: `overlay 已写入 (${scopes.join("+")} 档):\n  ${written.join("\n  ")}`,
 	);
 }
 

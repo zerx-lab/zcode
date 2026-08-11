@@ -32,7 +32,7 @@ alwaysApply: true
 
 - **品牌字面量一律从 `packages/utils/src/brand.ts` 取**，禁止在调用点硬编码 `zcode` / `.zcode` / `ZCODE_`。
 - **fork 变更记录写 `docs/fork/CHANGELOG.md`**，不写上游 `packages/*/CHANGELOG.md`（全仓最热文件，且 fork 不发 npm，写上游那份没有读者只有冲突）。
-- **上游/overlay 管辖的文件改它们的源**：根 `AGENTS.md` 属上游（fork 规约就写在本文件里）；根 `README.md`、`assets/**`、`scripts/install.*` 由 `brand/apply.ts` overlay 在 `release` 分支生成，改 `brand/` 下的模板。
+- **上游/overlay 管辖的文件改它们的源**：根 `AGENTS.md` 属上游（fork 规约就写在本文件里）；根 `README.md`、`assets/**`、`scripts/install.*` 全部由 `brand/apply.ts` 生成，改 `brand/` 下的模板。其中 `README.md` 是 `stack` 档（补丁栈上就是渲染态，冲突由 merge driver 解成重渲染），`assets/**` 与 `scripts/install.*` 是 `release` 档（**只在 `release` 分支上存在**，出现在 `zcode` 上就是事故）。
 - **品牌类与功能类改动分开 commit**，每个 commit 独立通过 `bun check`。
 - **修上游 bug 的通用改动先考虑 PR 回上游**——合并一个补丁就永久少一处冲突面。
 

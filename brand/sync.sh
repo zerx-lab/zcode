@@ -4,12 +4,8 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-# 提交门禁（幂等）：拦截被中断的 binary build 留下的 populated 占位文件
-git config core.hooksPath brand/hooks
-
-# rerere：记录冲突解法，供 CI (sync-upstream.yml) 自动重放
-git config rerere.enabled true
-git config rerere.autoupdate true
+# 仓库级 git 配置（提交门禁 / rerere / README merge driver），与 CI 共用一份
+bash brand/git-setup.sh
 
 git fetch upstream --no-tags
 
@@ -53,6 +49,7 @@ else
 	echo "(brand/verify.ts 尚未实现，跳过运行时门禁)"
 fi
 bash brand/hooks/selftest.sh
+bash brand/merge-readme-selftest.sh
 bun check || {
 	echo "bun check 失败。先做基线差分再改代码，别靠读 diff 猜是不是 fork 引入的：" >&2
 	echo "  bash brand/baseline.sh bun run check:ts" >&2

@@ -56,8 +56,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config rerere.enabled true
-          git config rerere.autoupdate true
+          # 提交门禁 / rerere / README merge driver，与 brand/sync.sh 共用一份配置。
+          # README 的 driver 必须在 rebase 之前注册，否则 git 静默回落到三方合并。
+          bash brand/git-setup.sh
           if ! git rebase upstream/main; then
             # rerere 可能已自动解掉全部冲突；带进度守卫地推进，
             # REBASE_HEAD 不前进（未知冲突 / hook 或提交创建反复失败）即放弃
@@ -93,10 +94,14 @@ jobs:
         if: steps.fetch.outputs.up_to_date == 'false'
         uses: oven-sh/setup-bun@v2
 
-      - name: Gate (bun check:ts)
+      # 门禁：品牌接线（含 README 唯一性 —— 上游 README 被并进来这里就红）+ 类型检查。
+      # --skip-cli 跳过唯一需要 native addon 的那项，同步流水线不构建 addon。
+      - name: Gate (brand + bun check:ts)
         if: steps.fetch.outputs.up_to_date == 'false'
         run: |
           bun install --frozen-lockfile
+          bun brand/verify.ts --skip-cli
+          bash brand/merge-readme-selftest.sh
           bun run check:ts
 
       - name: Push zcode
