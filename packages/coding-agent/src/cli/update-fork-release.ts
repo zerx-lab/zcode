@@ -109,6 +109,22 @@ export async function getLatestForkRelease(
 }
 
 /**
+ * 启动横幅检查（main.ts 最小接线）：有更新则返回展示版本（如 `17.2.14-z1`），
+ * 否则 undefined。启动路径静默失败——网络 / 限流 / tag 异常都不打扰用户。
+ */
+export async function checkForNewForkVersion(): Promise<string | undefined> {
+	try {
+		const latest = await getLatestForkRelease();
+		if (compareForkReleases(latest, localForkRelease()) > 0) {
+			return `${latest.version}-z${latest.iteration}`;
+		}
+	} catch {
+		// 与上游 checkForNewVersion 一致：启动检查失败不冒泡
+	}
+	return undefined;
+}
+
+/**
  * fork 只有「GitHub Release 二进制」一条更新通道：不发 npm（bun/npm 会装成上游
  * oh-my-pi），无 Homebrew tap，mise 的 github 后端也认不出 `zcode-v*` tag。
  * 非 binary 方法一律拒绝并指路重装，绝不能放行到上游的包管理器分支。
