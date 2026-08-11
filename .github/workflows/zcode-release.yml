@@ -99,6 +99,10 @@ jobs:
            run: bun brand/verify.ts
          - name: Pre-commit hook selftest
            run: bash brand/hooks/selftest.sh
+         # tag ↔ BRAND_RELEASE_ITERATION 一致性：迭代号编进二进制供 `zcode update`
+         # 检测同版本 -zN 热修，忘 bump 会让更新检测失明，直接 fail 掉发布。
+         - name: Release tag gate
+           run: bun brand/check-release-tag.ts "$RELEASE_TAG"
          - name: Build release binaries
            env:
               RELEASE_TARGETS: linux-x64,linux-arm64,linux-musl-x64,linux-musl-arm64,win32-x64

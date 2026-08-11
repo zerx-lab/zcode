@@ -1,10 +1,10 @@
 import { USER_AGENT } from "@oh-my-pi/pi-utils";
-import { BRAND_DISPLAY_NAME } from "@oh-my-pi/pi-utils/brand";
+import { BRAND_DISPLAY_NAME, BRAND_REPO } from "@oh-my-pi/pi-utils/brand";
 
 export function getOpenRouterHeaders(): Record<string, string> {
 	return {
 		"User-Agent": USER_AGENT,
-		"HTTP-Referer": "https://github.com/zerx-lab/oh-my-pi",
+		"HTTP-Referer": `https://github.com/${BRAND_REPO}`,
 		"X-OpenRouter-Title": BRAND_DISPLAY_NAME,
 		"X-OpenRouter-Categories": "cli-agent",
 		"X-OpenRouter-Cache": "true",

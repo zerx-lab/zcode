@@ -23,7 +23,21 @@ export const BRAND_DOCS_SCHEME = "zcode";
 export const BRAND_ENV_PREFIX = "ZCODE_";
 
 /** GitHub 仓库（发布/更新通道）。 */
-export const BRAND_REPO = "zerx-lab/oh-my-pi";
+export const BRAND_REPO = "zerx-lab/zcode";
+
+/**
+ * 发布 tag 前缀（上游 CI 只认 `v*`，独立前缀避免两套发布流互相触发）。
+ * 完整 tag 形如 `zcode-v<上游版本>-z<迭代>`；brand/apply.ts 与 update 通道共用此真源。
+ */
+export const BRAND_RELEASE_TAG_PREFIX = "zcode-v";
+
+/**
+ * 本构建对应的发布迭代号（`zcode-v<版本>-z<N>` 里的 N）。
+ * 打 tag 前必须与 tag 一致——`brand/check-release-tag.ts` 在发布流水线里强制校验，
+ * 忘 bump 会直接 fail 掉 release。`zcode update` 用它与远端 tag 比较，
+ * 以便同一上游版本内的 -zN 热修也能被检测到。
+ */
+export const BRAND_RELEASE_ITERATION = 2;
 
 /**
  * 项目级配置兼容目录（只读发现，不作为写入目标）。

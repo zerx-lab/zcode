@@ -16,6 +16,13 @@ import chalk from "@oh-my-pi/pi-utils/chalk";
 import { $ } from "bun";
 import { theme } from "../modes/theme/theme";
 import { isTimeoutError, withTimeoutSignal } from "../utils/fetch-timeout";
+import {
+	compareForkReleases,
+	ensureForkBinaryTarget,
+	type ForkRelease,
+	getLatestForkRelease,
+	localForkRelease,
+} from "./update-fork-release";
 
 const REPO = BRAND_REPO;
 const PACKAGE = "@oh-my-pi/pi-coding-agent";
@@ -185,8 +192,9 @@ async function getReleaseBinaryAsset(
 	binaryName: string,
 	fetchImpl: Fetch = fetch,
 	githubToken: string | undefined = $env.GITHUB_TOKEN || $env.GH_TOKEN,
+	releaseTag?: string,
 ): Promise<ReleaseBinaryAsset> {
-	const tag = `v${expectedVersion}`;
+	const tag = releaseTag ?? `v${expectedVersion}`;
 	const headers: Record<string, string> = {
 		Accept: "application/vnd.github+json",
 		"X-GitHub-Api-Version": "2022-11-28",
@@ -531,7 +539,7 @@ async function resolveUpdateTarget(options: { allowPackageManagers: boolean }): 
  * Get the latest release info from the npm registry.
  * Uses npm instead of GitHub API to avoid unauthenticated rate limiting.
  */
-async function getLatestRelease(): Promise<ReleaseInfo> {
+export async function getLatestRelease(): Promise<ReleaseInfo> {
 	let response: Response;
 	try {
 		response = await fetch(`${NPM_REGISTRY}${PACKAGE}/latest`, {
@@ -1143,6 +1151,7 @@ export async function updateViaBinaryAt(
 		fetchImpl?: Fetch;
 		githubToken?: string;
 		verifyInstalledVersion?: typeof verifyInstalledVersion;
+		releaseTag?: string;
 	} = {},
 ): Promise<void> {
 	const binaryName = options.binaryName ?? getBinaryName();
@@ -1152,7 +1161,13 @@ export async function updateViaBinaryAt(
 	// would force the move-aside rename to overwrite it. pid + timestamp keeps
 	// two forced updates in the same millisecond from colliding.
 	const backupPath = `${targetPath}.${Date.now()}.${process.pid}.bak`;
-	const asset = await getReleaseBinaryAsset(expectedVersion, binaryName, options.fetchImpl, options.githubToken);
+	const asset = await getReleaseBinaryAsset(
+		expectedVersion,
+		binaryName,
+		options.fetchImpl,
+		options.githubToken,
+		options.releaseTag,
+	);
 	console.log(chalk.dim(`Downloading ${binaryName}…`));
 	await downloadVerifiedBinary({
 		url: asset.url,
@@ -1323,15 +1338,15 @@ export async function runUpdateCommand(opts: { force: boolean; check: boolean })
 	console.log(chalk.dim(`Current version: ${VERSION}`));
 
 	// Check for updates
-	let release: ReleaseInfo;
+	let release: ForkRelease;
 	try {
-		release = await getLatestRelease();
+		release = await getLatestForkRelease();
 	} catch (err) {
 		console.error(chalk.red(`Failed to check for updates: ${err}`));
 		process.exit(1);
 	}
 
-	const comparison = compareVersions(release.version, VERSION);
+	const comparison = compareForkReleases(release, localForkRelease());
 
 	if (comparison <= 0 && !opts.force) {
 		console.log(chalk.green(`${theme.status.success} Already up to date`));
@@ -1339,7 +1354,7 @@ export async function runUpdateCommand(opts: { force: boolean; check: boolean })
 	}
 
 	if (comparison > 0) {
-		console.log(chalk.cyan(`New version available: ${release.version}`));
+		console.log(chalk.cyan(`New version available: ${release.tag}`));
 	} else {
 		console.log(chalk.yellow(`Forcing reinstall of ${release.version}`));
 	}
@@ -1355,7 +1370,8 @@ export async function runUpdateCommand(opts: { force: boolean; check: boolean })
 	// same PATH entry live.
 	try {
 		const forceBinary = shouldForceBinaryUpdate(release);
-		const target = await resolveUpdateTarget({ allowPackageManagers: !forceBinary });
+		const target = await resolveUpdateTarget({ allowPackageManagers: false });
+		ensureForkBinaryTarget(target);
 		if (target.method === "brew") {
 			await updateViaHomebrew(release.version, opts.force);
 		} else if (target.method === "mise") {
@@ -1382,7 +1398,7 @@ export async function runUpdateCommand(opts: { force: boolean; check: boolean })
 			if (forceBinary && target.replacesSymlink) {
 				console.log(chalk.dim("Replacing the package-manager launcher with the standalone binary."));
 			}
-			await updateViaBinaryAt(target.path, release.version);
+			await updateViaBinaryAt(target.path, release.version, { releaseTag: release.tag });
 			if (forceBinary && target.replacesSymlink) {
 				console.log(
 					chalk.yellow(
