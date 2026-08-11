@@ -21,6 +21,7 @@ import {
 	setProjectDir,
 	VERSION,
 } from "@oh-my-pi/pi-utils";
+import { BRAND_DISPLAY_VERSION } from "@oh-my-pi/pi-utils/brand";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { reset as resetCapabilities } from "./capability";
 import { type Args, reportUnrecognizedFlags } from "./cli/args";
@@ -1210,7 +1211,7 @@ export async function runRootCommand(
 	const notifs: (InteractiveModeNotify | null)[] = [];
 
 	if (parsedArgs.version) {
-		writeStartupNotice(parsedArgs, `${VERSION}\n`);
+		writeStartupNotice(parsedArgs, `${BRAND_DISPLAY_VERSION}\n`);
 		process.exit(0);
 	}
 
@@ -1761,7 +1762,7 @@ export async function runRootCommand(
 			logger.endTiming();
 			await runInteractiveMode(
 				session,
-				VERSION,
+				BRAND_DISPLAY_VERSION,
 				startupChangelog,
 				notifs,
 				versionCheckPromise,

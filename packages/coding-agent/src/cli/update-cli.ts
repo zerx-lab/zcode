@@ -11,7 +11,7 @@ import * as path from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { $env, $which, APP_NAME, compareVersions, isEnoent, VERSION } from "@oh-my-pi/pi-utils";
-import { BRAND_REPO } from "@oh-my-pi/pi-utils/brand";
+import { BRAND_DISPLAY_VERSION, BRAND_REPO } from "@oh-my-pi/pi-utils/brand";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { $ } from "bun";
 import { theme } from "../modes/theme/theme";
@@ -1335,7 +1335,7 @@ function installerHint(): string {
  * Run the update command.
  */
 export async function runUpdateCommand(opts: { force: boolean; check: boolean }): Promise<void> {
-	console.log(chalk.dim(`Current version: ${VERSION}`));
+	console.log(chalk.dim(`Current version: ${BRAND_DISPLAY_VERSION}`));
 
 	// Check for updates
 	let release: ForkRelease;
