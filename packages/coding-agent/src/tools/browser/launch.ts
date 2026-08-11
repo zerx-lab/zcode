@@ -202,8 +202,31 @@ function isExecutableFile(p: string): boolean {
 	}
 }
 
+/**
+ * Confirm a discovered candidate path is actually a Chromium-family browser
+ * before `resolveSystemChromium` hands it to Puppeteer, not some unrelated
+ * binary sitting at a well-known name. On POSIX this spawns `<exe> --version`
+ * and checks the printed banner — real Chromium/Chrome/Edge builds print and
+ * exit immediately there, so a hang or non-matching banner cleanly fails the
+ * probe (see `chromiumExecutableProbeForTest` tests).
+ *
+ * Windows candidates are exact vendor-hardcoded install paths (no PATH-based
+ * guessing like the POSIX list), so file existence alone is a safe signal —
+ * and it must be trusted rather than spawned: Chrome/Edge on Windows can hand
+ * off from the process Bun just spawned to a brand-new top-level PID (its
+ * single-instance relaunch) before ever writing to the piped stdout the probe
+ * is waiting on. When that happens the probe's timeout/`SIGKILL` only ever
+ * reaches the already-exited launcher stub Bun is tracking — the real,
+ * visible browser window survives, unmanaged, while the probe still reports
+ * failure and `ensureChromiumExecutable` falls through to downloading and
+ * launching a *third*, independent Chromium. Skipping the spawn removes the
+ * leak at the source instead of trying to clean up after it (killing "by
+ * path" post-hoc risks tearing down a browser window the user already had
+ * open for real work, not one this probe spawned).
+ */
 async function isChromiumExecutable(p: string): Promise<boolean> {
 	if (!isExecutableFile(p)) return false;
+	if (process.platform === "win32") return true;
 	try {
 		const probeTimeoutMs = 3000;
 		const proc = Bun.spawn([p, "--version"], {

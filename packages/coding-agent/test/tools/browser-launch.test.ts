@@ -10,6 +10,7 @@ import {
 import { TempDir } from "@oh-my-pi/pi-utils";
 
 const EXECUTABLE_PROBE = path.resolve(import.meta.dir, "../fixtures/browser-executable-probe.ts");
+const CHROMIUM_PROBE = path.resolve(import.meta.dir, "../fixtures/browser-chromium-probe.ts");
 
 const AUTOMATION_FLAG = "--enable-automation";
 
@@ -162,6 +163,57 @@ describe("browser executable selection", () => {
 
 			expect(result.exitCode, stderr).toBe(0);
 			expect(new TextDecoder().decode(result.stdout)).toBe(override);
+		} finally {
+			await tempDir.remove();
+		}
+	});
+});
+
+describe("Windows Chromium candidate probing", () => {
+	// Windows candidates are exact, vendor-hardcoded install paths (unlike the
+	// PATH-resolved POSIX list), so the probe must trust existence and never
+	// spawn the candidate: Chrome/Edge's single-instance relaunch can hand off
+	// to a brand-new PID before the probe's piped stdout ever sees output,
+	// which previously left a real, unmanaged browser window behind while the
+	// probe still reported failure (see `launch.ts#isChromiumExecutable`).
+	function runProbe(target: string) {
+		return Bun.spawnSync([process.execPath, CHROMIUM_PROBE, target], {
+			env: { ...process.env, OMP_BROWSER_PROBE_PLATFORM: "win32" },
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+	}
+
+	it("trusts an existing candidate path without spawning it", async () => {
+		const tempDir = TempDir.createSync("@browser-chromium-probe-");
+		try {
+			// Content that would fail (or hang) if actually spawned on this host:
+			// no shebang, not a real PE binary. A pass here proves the probe never
+			// executed it.
+			const candidate = path.join(tempDir.path(), "chrome.exe");
+			await Bun.write(candidate, "not a real binary");
+
+			const startedAt = performance.now();
+			const result = runProbe(candidate);
+			const stderr = new TextDecoder().decode(result.stderr);
+
+			expect(result.exitCode, stderr).toBe(0);
+			expect(new TextDecoder().decode(result.stdout)).toBe("true");
+			expect(performance.now() - startedAt).toBeLessThan(1000);
+		} finally {
+			await tempDir.remove();
+		}
+	});
+
+	it("still rejects a candidate path that does not exist", async () => {
+		const tempDir = TempDir.createSync("@browser-chromium-probe-missing-");
+		try {
+			const missing = path.join(tempDir.path(), "missing", "chrome.exe");
+			const result = runProbe(missing);
+			const stderr = new TextDecoder().decode(result.stderr);
+
+			expect(result.exitCode, stderr).toBe(0);
+			expect(new TextDecoder().decode(result.stdout)).toBe("false");
 		} finally {
 			await tempDir.remove();
 		}
