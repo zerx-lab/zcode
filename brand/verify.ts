@@ -6,9 +6,10 @@
  * 刻意保留的（改名 = 数千行 import 的永久冲突面），字符串扫描只会产出噪声。
  * 这里断言的全是**用户可见行为**：rebase 把某处接线弄丢了，这些断言会红。
  *
- * 跑法：`bun brand/verify.ts`（`brand/sync.sh` 第 4 步自动执行）。
- * `--skip-cli` 跳过唯一需要 native addon 的那项（源码入口 `--version`），供发布
- * 流水线在 addon 构建**之前**先把坏 tag / 坏树拦下来 —— 其余五项全是纯 import。
+ * 跑法：`bun brand/verify.ts`（`brand/sync.sh` 的门禁步骤自动执行）。**整份脚本都要
+ * native addon**：顶层 import 的 coding-agent 模块（router / welcome）会把
+ * `@oh-my-pi/pi-natives` 拽进来，addon 缺失时连模块都加载不了。addon 尚未构建的
+ * 前置门禁只能跑 `bun brand/apply.ts --check`（纯 pi-utils 依赖，含 README 唯一性）。
  */
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -23,7 +24,6 @@ import { auditOverlay } from "./apply";
 
 const repoRoot = path.join(import.meta.dir, "..");
 const failures: string[] = [];
-const skipCli = process.argv.includes("--skip-cli");
 
 function check(name: string, ok: boolean, detail: string): void {
 	if (ok) {
@@ -35,9 +35,7 @@ function check(name: string, ok: boolean, detail: string): void {
 }
 
 // 1) CLI 身份：源码入口的 --version 是 fork 产品名。
-if (skipCli) {
-	console.log("  skip  cli --version — --skip-cli（native addon 尚未就绪）");
-} else {
+{
 	const home = await fs.mkdtemp(path.join(os.tmpdir(), "zcode-verify-"));
 	try {
 		const proc = Bun.spawnSync(["bun", path.join("packages", "coding-agent", "src", "cli.ts"), "--version"], {
