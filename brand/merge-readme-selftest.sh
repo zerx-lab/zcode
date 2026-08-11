@@ -31,6 +31,7 @@ scaffold() {
 	mkdir -p "$dir/brand" "$dir/packages/utils/src"
 	cp brand/merge-readme.sh brand/git-setup.sh brand/apply.ts brand/README.md "$dir/brand/"
 	cp packages/utils/src/brand.ts packages/utils/src/brand-consts.ts "$dir/packages/utils/src/"
+	cp packages/utils/package.json "$dir/packages/utils/"
 	git init -q -b upstream "$dir"
 	git -C "$dir" config user.email probe@example.com
 	git -C "$dir" config user.name probe
