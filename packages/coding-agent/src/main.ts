@@ -30,6 +30,7 @@ import { processFileArguments } from "./cli/file-processor";
 import { buildInitialMessage } from "./cli/initial-message";
 import { selectSession } from "./cli/session-picker";
 import { applyStartupCwd } from "./cli/startup-cwd";
+import { checkForNewForkVersion } from "./cli/update-fork-release";
 import { findConfigFile } from "./config";
 import { ModelRegistry } from "./config/model-registry";
 import {
@@ -95,7 +96,6 @@ import { concreteThinkingLevel, parseConfiguredThinkingLevel } from "./thinking"
 import type { LspStartupServerInfo } from "./tools";
 import { getChangelogPath, resolveStartupChangelogForDisplay, type StartupChangelogSelection } from "./utils/changelog";
 import { EventBus } from "./utils/event-bus";
-import { withTimeoutSignal } from "./utils/fetch-timeout";
 
 type RunAcpMode = (createSession: AcpSessionFactory) => Promise<never>;
 type RunPrintMode = (session: AgentSession, options: PrintModeOptions) => Promise<void>;
@@ -110,27 +110,12 @@ export function writeStartupNotice(parsedArgs: Pick<Args, "mode">, text: string)
 	(parsedArgs.mode === "json" ? process.stderr : process.stdout).write(text);
 }
 
-async function checkForNewVersion(currentVersion: string): Promise<string | undefined> {
+// fork：启动检查只看 zcode 的 GitHub Release（npm latest 是上游 oh-my-pi 的版本）。
+async function checkForNewVersion(_currentVersion: string): Promise<string | undefined> {
 	if (!settings.get("startup.checkUpdate")) {
 		return;
 	}
-	try {
-		const response = await fetch("https://registry.npmjs.org/@oh-my-pi/pi-coding-agent/latest", {
-			signal: withTimeoutSignal(5_000),
-		});
-		if (!response.ok) return undefined;
-
-		const data = (await response.json()) as { version?: string };
-		const latestVersion = data.version;
-
-		if (latestVersion && Bun.semver.order(latestVersion, currentVersion) > 0) {
-			return latestVersion;
-		}
-
-		return undefined;
-	} catch {
-		return undefined;
-	}
+	return checkForNewForkVersion();
 }
 
 // Todo settings are caller-controlled in protocol modes. Do not host-default them:
