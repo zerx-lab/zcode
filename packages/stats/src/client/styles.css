@@ -92,6 +92,7 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    height: 100%;
   }
 
   body {
@@ -99,7 +100,12 @@
     background: var(--page);
     color: var(--text);
     margin: 0;
-    min-height: 100vh;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
   }
 
   /* Accessible focus ring style */
@@ -116,7 +122,9 @@
    ========================================================================== */
 .stats-app-container {
   display: flex;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: var(--page);
   color: var(--text);
 }
@@ -129,6 +137,8 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .stats-desktop-nav {
@@ -235,10 +245,13 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .stats-top-bar {
   height: 56px;
+  flex-shrink: 0;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -316,7 +329,9 @@
 
 .stats-content-area {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .stats-content-inner {
