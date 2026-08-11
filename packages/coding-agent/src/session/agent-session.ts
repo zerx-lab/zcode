@@ -112,6 +112,7 @@ import type { PythonResult } from "../eval/py/executor";
 import type { BashResult } from "../exec/bash-executor";
 import type { TtsrManager } from "../export/ttsr";
 import { expandAndDispatchSlashCommand } from "../extensibility/command-dispatch";
+import { type PreparedSubagentDispatch, runSubagentDispatch } from "../extensibility/command-subagent-dispatch";
 import type { LoadedCustomCommand } from "../extensibility/custom-commands";
 import type { CustomTool } from "../extensibility/custom-tools/types";
 import type {
@@ -598,6 +599,12 @@ export class AgentSession {
 	readonly #loopGuards: LoopGuards;
 	#promptInFlightCount = 0;
 	#abortInProgress = false;
+	/**
+	 * zcode fork: controllers for work that runs inside a turn but before the
+	 * agent loop owns it (a `subtask:` slash command's `task` call). `abort()`
+	 * cancels them so a user interrupt reaches a running subagent.
+	 */
+	readonly #preModelAbortControllers = new Set<AbortController>();
 	// Wire-level agent_end emission deferred until #promptInFlightCount drops to 0.
 	// Internal extension hooks and post-emit work (auto-retry, auto-compaction, todo
 	// checks in #handleAgentEvent) still fire on the original schedule — only the
@@ -5061,6 +5068,8 @@ export class AgentSession {
 	 */
 	async prompt(text: string, options?: PromptOptions): Promise<boolean> {
 		const expandPromptTemplates = options?.expandPromptTemplates ?? true;
+		/** zcode fork: prepared `task` call from a `subtask:` slash command. */
+		let subagentDispatch: PreparedSubagentDispatch | undefined;
 
 		// Handle extension commands first (execute immediately, even during streaming)
 		if (expandPromptTemplates && text.startsWith("/")) {
@@ -5081,7 +5090,12 @@ export class AgentSession {
 			// Try file-based slash commands (markdown files from commands/ directories)
 			// Only if text still starts with "/" (wasn't transformed by custom command)
 			if (text.startsWith("/")) {
-				text = await expandAndDispatchSlashCommand(this, text, this.#slashCommands);
+				const outcome = await expandAndDispatchSlashCommand(this, text, this.#slashCommands);
+				// zcode fork: `undefined` means the dispatch was rejected outright (a
+				// `subtask:` command with no task tool); nothing may run in its place.
+				if (outcome.text === undefined) return false;
+				text = outcome.text;
+				subagentDispatch = outcome.dispatch;
 			}
 		}
 
@@ -5167,6 +5181,7 @@ export class AgentSession {
 					preludeMessages.length > 0 || keywordNotices.length > 0 || imageDescriptionNotice
 						? [...preludeMessages, ...keywordNotices, ...(imageDescriptionNotice ? [imageDescriptionNotice] : [])]
 						: undefined,
+				subagentDispatch,
 			});
 		} finally {
 			// Clean up residual eager-todo directive if the prompt never consumed it
@@ -5245,6 +5260,13 @@ export class AgentSession {
 			prependMessages?: AgentMessage[];
 			skipPostPromptRecoveryWait?: boolean;
 			acceptTerminalEmptyStop?: boolean;
+			/**
+			 * zcode fork: a `subtask:` slash command's prepared `task` call. When set,
+			 * the assembled messages are committed and the call runs here instead of
+			 * being handed to the model, so the turn's first model call is already the
+			 * relay of the subagent's result.
+			 */
+			subagentDispatch?: PreparedSubagentDispatch;
 		},
 	): Promise<void> {
 		this.#beginInFlight();
@@ -5456,7 +5478,15 @@ export class AgentSession {
 				this.#planReferenceSent = true;
 			}
 			try {
-				await this.#recovery.promptAgentWithIdleRetry(messages, agentPromptOptions);
+				// zcode fork: a dispatching turn commits `messages` itself, runs its
+				// prepared `task` call, and re-enters the loop through `continue()`.
+				// `agentPromptOptions.toolChoice` is moot there — nothing needs forcing
+				// when the call is already made.
+				if (options?.subagentDispatch) {
+					await runSubagentDispatch(this, options.subagentDispatch, messages);
+				} else {
+					await this.#recovery.promptAgentWithIdleRetry(messages, agentPromptOptions);
+				}
 			} finally {
 				this.#stats.setPendingSnapshot(undefined);
 			}
@@ -6321,6 +6351,7 @@ export class AgentSession {
 		try {
 			this.#abortAutolearnCapture();
 			for (const controller of this.#usagePreflightAbortControllers) controller.abort();
+			for (const controller of this.#preModelAbortControllers) controller.abort();
 			this.abortRetry();
 			this.#promptGeneration++;
 			this.#scheduledHiddenNextTurnGeneration = undefined;
@@ -6376,6 +6407,18 @@ export class AgentSession {
 			this.#abortInProgress = false;
 			this.#drainStrandedQueuedMessages();
 		}
+	}
+
+	/**
+	 * zcode fork: register an abort controller for in-turn work the agent loop
+	 * does not own yet — currently a `subtask:` slash command's `task` call,
+	 * which runs after the turn preamble but before the first model call. The
+	 * session already reports `isStreaming` there, so the UI offers an interrupt
+	 * that must actually reach the subagent. Returns the deregistration handle.
+	 */
+	registerPreModelAbort(controller: AbortController): () => void {
+		this.#preModelAbortControllers.add(controller);
+		return () => this.#preModelAbortControllers.delete(controller);
 	}
 
 	/**
