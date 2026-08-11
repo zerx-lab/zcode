@@ -67,7 +67,7 @@ bash brand/sync.sh
 
 ### 自动同步（GitHub Actions）
 
-`.github/workflows/sync-upstream.yml`（zcode 上的 fork 新文件）每天 UTC 22:00 无人值守执行：fetch upstream → 从 `refs/brand/rr-cache` 种入 rerere 解法 → `bash brand/git-setup.sh`（driver 必须在 rebase **之前**注册，否则 git 静默回落到三方合并）→ rebase `zcode`（带进度守卫：`REBASE_HEAD` 不前进即 abort，防非冲突失败被吞或无限重试）→ 门禁 `bun brand/verify.ts --skip-cli` + merge driver 探针 + `bun run check:ts` → `--force-with-lease=zcode` 只推 `zcode`；镜像分支 `main` 的快进是独立的 best-effort 步骤（`continue-on-error`），失败不阻断也不参与失败语义——**run 红 = `zcode` 没动，需人工**。前提：fork 默认分支须为 `zcode`（`schedule` 只读默认分支上的 workflow）。
+`.github/workflows/sync-upstream.yml`（zcode 上的 fork 新文件）每天 UTC 22:00 无人值守执行：fetch upstream → 从 `refs/brand/rr-cache` 种入 rerere 解法 → `bash brand/git-setup.sh`（driver 必须在 rebase **之前**注册，否则 git 静默回落到三方合并）→ rebase `zcode`（带进度守卫：`REBASE_HEAD` 不前进即 abort，防非冲突失败被吞或无限重试）→ 门禁 `bun brand/apply.ts --check`（overlay 期望态，含 README 唯一性）+ merge driver 探针 + `bun run check:ts` → `--force-with-lease=zcode` 只推 `zcode`；镜像分支 `main` 的快进是独立的 best-effort 步骤（`continue-on-error`），失败不阻断也不参与失败语义——**run 红 = `zcode` 没动，需人工**。门禁不跑 `verify.ts`：它要 native addon（见下），同步流水线不构建 addon。前提：fork 默认分支须为 `zcode`（`schedule` 只读默认分支上的 workflow）。
 
 冲突分工：
 
@@ -162,7 +162,7 @@ bash brand/sync.sh
 ```
 brand/
   apply.ts                    # MANIFEST（scope + 三种生成方式），--check 审计 / --render 单目标
-  verify.ts                   # 运行时门禁（见下），--skip-cli 供 addon 未就绪的前置门禁
+  verify.ts                   # 运行时门禁（见下）；要 native addon 才加载得动
   git-setup.sh                # 仓库级 git 配置：hooks / rerere / README merge driver + 挂载点
   merge-readme.sh             # merge driver 本体：README 冲突 → 用 brand/README.md 重渲染
   merge-readme-selftest.sh    # 上面那条的行为探针（真 rebase 冲突 + 负对照 + 回退路径）
@@ -235,14 +235,14 @@ manifest 就是 `apply.ts` 里的 `MANIFEST` 数组，不单独开 json：`rewri
 
 ```
 zcode 上打 zcode-v<上游版本>-z<迭代>
-  └─ gate       ubuntu：tag ↔ 迭代号一致性 + 品牌门禁(--skip-cli) + 两个 selftest。~1 min
+  └─ gate       ubuntu：tag ↔ 迭代号一致性 + overlay 期望态 + 两个 selftest。~1 min
        ├─ natives    ubuntu：串行建 6 个非 darwin addon（并发会 OOM）
        │    └─ binaries   ubuntu：完整品牌门禁 + bun --compile 交叉出 5 个非 darwin 二进制
        ├─ darwin×2   macos-14 / macos-15-intel：自带 bazel addon 构建
        └─ publish    omp-* → zcode-* 改名 + SHA256SUMS.txt + GitHub Release
 ```
 
-`gate` 独立成作业并前置于其余三条腿：不依赖 native addon 的检查（tag 一致性、overlay 期望态、hooks 与 merge driver 探针）30 秒就能跑完，排在 addon 后面等于每次坏 tag 都先烧掉一小时机时（z3 实测 73 分钟）。需要 addon 才能起源码入口的那一项（`--version`）留在 `binaries` 作业里补跑。
+`gate` 独立成作业并前置于其余三条腿：不依赖 native addon 的检查（tag 一致性、overlay 期望态、hooks 与 merge driver 探针）30 秒就能跑完，排在 addon 后面等于每次坏 tag 都先烧掉一小时机时（z3 实测 73 分钟）。`verify.ts` 整份都进不了 `gate`：它顶层 import 的 `router.ts` / `welcome.ts` 会拽进 `@oh-my-pi/pi-natives`，addon 缺失时模块都加载不了（第一次尝试用 `--skip-cli` 只跳过 spawn 那项，仍然在 import 期就炸），所以完整门禁留在 `binaries` 作业里补跑，`gate` 只跑纯 `pi-utils` 依赖的 `apply.ts --check`。
 
 与上游发布流的差异（fork 只有 GitHub Releases 一条通道）：不发 npm（`@oh-my-pi/*` 包名刻意不改，发布会撞名）、不更新 Homebrew tap、不做 Apple Developer ID 签名/公证（darwin 仍是 ad-hoc 签名）、全部跑 GitHub 托管 runner（上游的 `omp-kata` 自建池本 fork 没有，bazel 靠 `actions/cache` 磁盘缓存，首次冷构建慢是预期内的）。
 
