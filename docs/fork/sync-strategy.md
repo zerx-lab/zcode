@@ -13,16 +13,23 @@
 | 类别 | 特征 | 归属 | 机制 |
 |---|---|---|---|
 | **Patch（内联补丁）** | 上游也在改同一文件，必须逐行交错 | `zcode` 栈内 commit | `rebase` + `rerere` |
-| **Overlay（整文件独占）** | 内容 100% 由本 fork 决定，上游版本无价值 | `release` 上的生成产物 | 每次同步重新生成，**不参与三方合并** |
+| **Overlay（整文件独占）** | 内容 100% 由本 fork 决定，上游版本无价值 | 见下面两档 | 从模板重新生成，**不参与三方合并** |
 
-判据：**只要有 TS/Rust 代码 import 它，就必须在 patch 里**（否则 `zcode` 栈单独过不了 `bun check`）。Overlay 只放"落在上游已有路径上的纯产物"（根 `README.md`、`assets/**`、`scripts/install.{sh,ps1}`）。
+判据：**只要有 TS/Rust 代码 import 它，就必须在 patch 里**（否则 `zcode` 栈单独过不了 `bun check`）。Overlay 只放"落在上游已有路径上的纯产物"，按归属再分两档（`apply.ts` 里 `MANIFEST` 每条都带 `scope`）：
+
+|档|目标|在 `zcode` 上|在 `release` 上|
+|---|---|---|---|
+|`stack`|根 `README.md`|**必须是渲染态**|同左（内容一致）|
+|`release`|`assets/**`、`scripts/install.{sh,ps1}`|必须**缺席**（保持上游原样）|必须已应用|
+
+`README.md` 单独进 `stack` 档：默认分支是 `zcode`，GitHub 首页和一行流安装说明都从它读，等到 `release` 才品牌化就晚了。代价是它进补丁栈、参与 rebase —— 由 `zcode-readme` merge driver 兜底（见下），上游 README 的内容永不并入。其余产物留在 `release`：那条分支每次同步 `git branch -f` 重建，结构上不可能冲突。
 
 明确禁止：
 - ❌ 改任何 `package.json` 的 `name` 字段（top30 热点里有 10 个 package.json，发版全量触碰）
 - ❌ 碰 `CHANGELOG.md`（3283 次触碰/90d，全仓最热文件）
 - ❌ 全局 sed rename `omp`/`oh-my-pi`（数千行 import 路径，等于永久全量冲突）
 - ❌ 往根 `package.json` 加 scripts（292 次触碰/90d）；直接 `bun brand/sync.sh` 调用
-- ❌ merge driver（`merge=ours` 等）：rebase 下 ours/theirs 方向反转，且 `.gitattributes` 在重放引入它自身的 commit 时尚未生效——静默丢失品牌文件
+- ⚠️ merge driver：默认禁止（rebase 下 ours/theirs 方向反转，且版本内 `.gitattributes` 在重放引入它自身的 commit 之前尚未生效——静默丢失品牌文件）。**唯一例外**是 `README.md` 的 `zcode-readme`，两条反对意见都被单独拆掉了：driver 不取任何一侧，而是用 `brand/README.md` 重渲染（与 ours/theirs 方位无关）；挂载点写在 `.git/info/attributes`（由 `brand/git-setup.sh` 装，不随重放位置生效/失效）。行为探针 `brand/merge-readme-selftest.sh` 造真实 rebase 冲突验证，含"不注册 driver 时确实会冲突"的负对照。
 
 ## 分支拓扑
 
@@ -34,7 +41,7 @@ upstream/main (can1357, 只读)
   ├── zcode       补丁栈（唯一会冲突的分支）。品牌 commit 在前、功能 commit 在后。
   │               必须独立通过 bun check。同步 = git rebase upstream/main
   │
-  └── release     派生物，可随时丢弃。= zcode + overlay 产物。
+  └── release     派生物，可随时丢弃。= zcode + release 档 overlay 产物。
                   每次同步 git branch -f release zcode 重建，从不 rebase。
 ```
 
@@ -50,16 +57,17 @@ bash brand/sync.sh
 
 脚本步骤（详见 `brand/sync.sh`）：
 
+0. `bash brand/git-setup.sh` —— 仓库级 git 配置（提交门禁 / rerere / README merge driver + 它在 `.git/info/attributes` 的挂载点）。幂等，CI 的 `sync-upstream.yml` 调的是同一份，两边配置不可能漂移
 1. `git fetch upstream`
 2. **漂移审查**（rebase 之前）：列出 `refs/brand/last-sync..upstream/main` 中新增的品牌硬编码候选（`"omp` / `oh-my-pi` / `can1357` / `.omp/` / `omp://`），人工裁决是否纳入补丁
-3. `git checkout zcode && git rebase upstream/main` —— 唯一冲突点，rerere 自动重放已知解法（`rerere.enabled` + `rerere.autoUpdate` 已配置）
-4. `git branch -f release zcode && git checkout release && bun brand/apply.ts`，产物 commit（空则跳过）
-5. 门禁：`bun brand/verify.ts` + `bun check`
+3. `git checkout zcode && git rebase upstream/main` —— 唯一冲突点，rerere 自动重放已知解法；`README.md` 的冲突由 merge driver 直接解成重渲染
+4. `git branch -f release zcode && git checkout release && bun brand/apply.ts`，产物 commit（空则跳过）。`apply.ts` 按当前分支分档写盘：在 `zcode` 上误跑只会刷新 `README.md`，不会把 `release` 产物撒进补丁栈
+5. 门禁：`bun brand/verify.ts` + `bash brand/hooks/selftest.sh` + `bash brand/merge-readme-selftest.sh` + `bun check`
 6. **全绿后**才 `git update-ref refs/brand/last-sync upstream/main`，并把 `.git/rr-cache` 快照发布到 `origin` 的 `refs/brand/rr-cache`（供 CI 重放）
 
 ### 自动同步（GitHub Actions）
 
-`.github/workflows/sync-upstream.yml`（zcode 上的 fork 新文件）每天 UTC 22:00 无人值守执行：fetch upstream → 从 `refs/brand/rr-cache` 种入 rerere 解法 → rebase `zcode`（带进度守卫：`REBASE_HEAD` 不前进即 abort，防非冲突失败被吞或无限重试）→ `bun run check:ts` 门禁 → `--force-with-lease=zcode` 只推 `zcode`；镜像分支 `main` 的快进是独立的 best-effort 步骤（`continue-on-error`），失败不阻断也不参与失败语义——**run 红 = `zcode` 没动，需人工**。前提：fork 默认分支须为 `zcode`（`schedule` 只读默认分支上的 workflow）。
+`.github/workflows/sync-upstream.yml`（zcode 上的 fork 新文件）每天 UTC 22:00 无人值守执行：fetch upstream → 从 `refs/brand/rr-cache` 种入 rerere 解法 → `bash brand/git-setup.sh`（driver 必须在 rebase **之前**注册，否则 git 静默回落到三方合并）→ rebase `zcode`（带进度守卫：`REBASE_HEAD` 不前进即 abort，防非冲突失败被吞或无限重试）→ 门禁 `bun brand/verify.ts --skip-cli` + merge driver 探针 + `bun run check:ts` → `--force-with-lease=zcode` 只推 `zcode`；镜像分支 `main` 的快进是独立的 best-effort 步骤（`continue-on-error`），失败不阻断也不参与失败语义——**run 红 = `zcode` 没动，需人工**。前提：fork 默认分支须为 `zcode`（`schedule` 只读默认分支上的 workflow）。
 
 冲突分工：
 
@@ -153,19 +161,22 @@ bash brand/sync.sh
 
 ```
 brand/
-  apply.ts          # manifest + 三种生成方式（copy / render / rewrite），--check 只比对
-  verify.ts         # 运行时门禁（见下）
-  gen-logo.ts       # BRAND_RAMP → brand/logo/*.svg
-  gen-hero.ts       # banner.html → brand/assets/hero.png（无头 Chromium 光栅化）
-  sync.sh           # 同步脚本
-  baseline.sh       # 上游基线差分
-  hooks/pre-commit  # 提交门禁（见下）
-  README.md         # fork 的根 README 源（{{TOKEN}} 模板）
-  assets/           # banner.html（模板）+ hero.png（checked-in 光栅产物）
-  logo/             # 字标定稿：zcode-mark.svg / -mono.svg / preview.html
+  apply.ts                    # MANIFEST（scope + 三种生成方式），--check 审计 / --render 单目标
+  verify.ts                   # 运行时门禁（见下），--skip-cli 供 addon 未就绪的前置门禁
+  git-setup.sh                # 仓库级 git 配置：hooks / rerere / README merge driver + 挂载点
+  merge-readme.sh             # merge driver 本体：README 冲突 → 用 brand/README.md 重渲染
+  merge-readme-selftest.sh    # 上面那条的行为探针（真 rebase 冲突 + 负对照 + 回退路径）
+  gen-logo.ts                 # BRAND_RAMP → brand/logo/*.svg
+  gen-hero.ts                 # banner.html → brand/assets/hero.png（无头 Chromium 光栅化）
+  sync.sh                     # 同步脚本
+  baseline.sh                 # 上游基线差分
+  hooks/pre-commit            # 提交门禁（见下）
+  README.md                   # fork 的根 README 源（{{TOKEN}} 模板，stack 档）
+  assets/                     # banner.html（模板）+ hero.png（checked-in 光栅产物）
+  logo/                       # 字标定稿：zcode-mark.svg / -mono.svg / preview.html
 ```
 
-manifest 就是 `apply.ts` 里的 `MANIFEST` 数组，不单独开 json：`rewrite` 条目要带函数式的锚点规则，拆成数据文件只会把规则和执行分家。三种生成方式：
+manifest 就是 `apply.ts` 里的 `MANIFEST` 数组，不单独开 json：`rewrite` 条目要带函数式的锚点规则，拆成数据文件只会把规则和执行分家。每条带一个 `scope`（`stack` / `release`，见「核心原则」）和三种生成方式之一：
 
 |方式|用于|失效行为|
 |---|---|---|
@@ -214,21 +225,24 @@ manifest 就是 `apply.ts` 里的 `MANIFEST` 数组，不单独开 json：`rewri
 | `omp://docs` | **仍可受理**（别名兼容） |
 | `ZCODE_*` / `OMP_*` env | 都映射到 `PI_*` |
 | `welcome.ts` 的 `PI_LOGO` | === `ZCODE_LOGO`，且 5 行等宽、只含 `█ ▀ ▄` |
-| overlay | `apply.ts --check` 无漂移（仅在已应用的树上校验，zcode 上跳过） |
+| overlay | 期望态成立：`stack` 档处处是渲染态；`release` 档只在 `release` 分支上应用，补丁栈上必须缺席 |
 
-末条让门禁在两个分支上都有意义：`zcode` 上跳过 overlay 只查接线，`release` 上连产物一起查。
+末条让门禁在两个分支上都有意义，判据是**分支 + 分档**而不是文件内容启发式。旧实现靠"README 里有没有 `BRAND_REPO`"嗅探自己在哪条分支上，README 进 `stack` 档之后这条嗅探恒真，于是把 `release` 档也拿到 `zcode` 上校验 —— `zcode-v17.2.12-z3` 的发布就是这么红的（而且红在 73 分钟的 addon 构建之后）。
 
 ## 发布（`.github/workflows/zcode-release.yml`）
 
 新文件 → 零冲突。上游 `ci.yml` 一行不动：它只在 push `main` / PR 时触发，`v*` tag 的发布走 main 分支推送；本工作流只认 `zcode-v*` tag，两套流程不重叠。
 
 ```
-zcode 上打 zcode-v<上游版本>-z<迭代>  →  verify（品牌门禁 + hooks selftest）
-                                      ├─ natives    ubuntu：串行建 6 个非 darwin addon（并发会 OOM）
-                                      ├─ binaries   ubuntu：bun --compile 交叉出 5 个非 darwin 二进制
-                                      ├─ darwin×2   macos-14 / macos-15-intel：自带 bazel addon 构建
-                                      └─ publish    omp-* → zcode-* 改名 + SHA256SUMS.txt + GitHub Release
+zcode 上打 zcode-v<上游版本>-z<迭代>
+  └─ gate       ubuntu：tag ↔ 迭代号一致性 + 品牌门禁(--skip-cli) + 两个 selftest。~1 min
+       ├─ natives    ubuntu：串行建 6 个非 darwin addon（并发会 OOM）
+       │    └─ binaries   ubuntu：完整品牌门禁 + bun --compile 交叉出 5 个非 darwin 二进制
+       ├─ darwin×2   macos-14 / macos-15-intel：自带 bazel addon 构建
+       └─ publish    omp-* → zcode-* 改名 + SHA256SUMS.txt + GitHub Release
 ```
+
+`gate` 独立成作业并前置于其余三条腿：不依赖 native addon 的检查（tag 一致性、overlay 期望态、hooks 与 merge driver 探针）30 秒就能跑完，排在 addon 后面等于每次坏 tag 都先烧掉一小时机时（z3 实测 73 分钟）。需要 addon 才能起源码入口的那一项（`--version`）留在 `binaries` 作业里补跑。
 
 与上游发布流的差异（fork 只有 GitHub Releases 一条通道）：不发 npm（`@oh-my-pi/*` 包名刻意不改，发布会撞名）、不更新 Homebrew tap、不做 Apple Developer ID 签名/公证（darwin 仍是 ad-hoc 签名）、全部跑 GitHub 托管 runner（上游的 `omp-kata` 自建池本 fork 没有，bazel 靠 `actions/cache` 磁盘缓存，首次冷构建慢是预期内的）。
 

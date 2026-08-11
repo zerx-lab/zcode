@@ -7,6 +7,8 @@
  * 这里断言的全是**用户可见行为**：rebase 把某处接线弄丢了，这些断言会红。
  *
  * 跑法：`bun brand/verify.ts`（`brand/sync.sh` 第 4 步自动执行）。
+ * `--skip-cli` 跳过唯一需要 native addon 的那项（源码入口 `--version`），供发布
+ * 流水线在 addon 构建**之前**先把坏 tag / 坏树拦下来 —— 其余五项全是纯 import。
  */
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -14,18 +16,14 @@ import * as path from "node:path";
 import { InternalUrlRouter } from "../packages/coding-agent/src/internal-urls/router";
 import { PI_LOGO } from "../packages/coding-agent/src/modes/components/welcome";
 import { ZCODE_LOGO } from "../packages/coding-agent/src/modes/components/brand-logo";
-import {
-	BRAND_APP_NAME,
-	BRAND_CONFIG_DIR_NAME,
-	BRAND_DOCS_SCHEME,
-	BRAND_ENV_PREFIX,
-	BRAND_REPO,
-} from "../packages/utils/src/brand";
+import { BRAND_APP_NAME, BRAND_CONFIG_DIR_NAME, BRAND_DOCS_SCHEME, BRAND_ENV_PREFIX } from "../packages/utils/src/brand";
 import { getConfigRootDir } from "../packages/utils/src/dirs";
 import { parseEnvFile } from "../packages/utils/src/env";
+import { auditOverlay } from "./apply";
 
 const repoRoot = path.join(import.meta.dir, "..");
 const failures: string[] = [];
+const skipCli = process.argv.includes("--skip-cli");
 
 function check(name: string, ok: boolean, detail: string): void {
 	if (ok) {
@@ -37,7 +35,9 @@ function check(name: string, ok: boolean, detail: string): void {
 }
 
 // 1) CLI 身份：源码入口的 --version 是 fork 产品名。
-{
+if (skipCli) {
+	console.log("  skip  cli --version — --skip-cli（native addon 尚未就绪）");
+} else {
 	const home = await fs.mkdtemp(path.join(os.tmpdir(), "zcode-verify-"));
 	try {
 		const proc = Bun.spawnSync(["bun", path.join("packages", "coding-agent", "src", "cli.ts"), "--version"], {
@@ -89,15 +89,11 @@ function check(name: string, ok: boolean, detail: string): void {
 	check("logo uses full blocks only", illegal.length === 0, illegal.length === 0 ? "█▀▄ + space" : illegal.join(""));
 }
 
-// 6) Overlay：只在已应用的树（release 分支）上校验，zcode 上跳过。
+// 6) Overlay：期望态按分支分档判定（`stack` 处处必须渲染态，`release` 档只在
+//    release 分支上应用），判据与失败文案都在 apply.ts 里，见 auditOverlay。
 {
-	const readme = await Bun.file(path.join(repoRoot, "README.md")).text();
-	if (!readme.includes(BRAND_REPO)) {
-		console.log("  skip  overlay — README 未品牌化（zcode 分支，overlay 只存在于 release）");
-	} else {
-		const proc = Bun.spawnSync(["bun", path.join("brand", "apply.ts"), "--check"], { cwd: repoRoot });
-		check("overlay up to date", proc.exitCode === 0, proc.stdout.toString().trim() || proc.stderr.toString().trim());
-	}
+	const audit = await auditOverlay();
+	check("overlay expected state", audit.ok, audit.detail);
 }
 
 if (failures.length > 0) {
