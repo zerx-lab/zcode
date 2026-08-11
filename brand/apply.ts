@@ -27,6 +27,7 @@ import {
 	BRAND_DOCS_SCHEME,
 	BRAND_ENV_PREFIX,
 	BRAND_RAMP,
+	BRAND_RELEASE_TAG_PREFIX,
 	BRAND_REPO,
 } from "../packages/utils/src/brand";
 
@@ -36,8 +37,8 @@ export const UPSTREAM_REPO = "can1357/oh-my-pi";
 /** 面向用户的分支：overlay 产物只存在于这里，install 一行流因此指向它。 */
 export const RELEASE_BRANCH = "release";
 
-/** 发布 tag 前缀。上游 CI 只认 `v*`，用独立前缀避免两套发布流互相触发。 */
-export const RELEASE_TAG_PREFIX = "zcode-v";
+/** 发布 tag 前缀。真源在 brand.ts（update 通道同用）；此处仅转发给 overlay 消费方。 */
+export const RELEASE_TAG_PREFIX = BRAND_RELEASE_TAG_PREFIX;
 
 const repoRoot = path.join(import.meta.dir, "..");
 

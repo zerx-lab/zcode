@@ -64,7 +64,7 @@ irm https://raw.githubusercontent.com/{{REPO}}/{{RELEASE_BRANCH}}/scripts/instal
 
 ```sh
 git clone -b zcode https://github.com/{{REPO}}.git
-cd oh-my-pi && bun install && bun run setup
+cd zcode && bun install && bun run setup
 ```
 
 跑起来：
