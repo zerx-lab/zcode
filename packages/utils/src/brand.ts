@@ -38,7 +38,7 @@ export const BRAND_RELEASE_TAG_PREFIX = "zcode-v";
  * 忘 bump 会直接 fail 掉 release。`zcode update` 用它与远端 tag 比较，
  * 以便同一上游版本内的 -zN 热修也能被检测到。
  */
-export const BRAND_RELEASE_ITERATION = 4;
+export const BRAND_RELEASE_ITERATION = 5;
 
 /**
  * 面向用户展示的完整版本号：`<上游版本>-z<迭代>`（如 `17.2.12-z3`）。
