@@ -49,9 +49,10 @@ jobs:
          # 检测同版本 -zN 热修，忘 bump 会让更新检测失明，直接 fail 掉发布。
          - name: Release tag gate
            run: bun brand/check-release-tag.ts "$RELEASE_TAG"
-         # --skip-cli：源码入口要 native addon 才起得来，那一项留给 binaries 作业补。
-         - name: Brand gate (no addon)
-           run: bun brand/verify.ts --skip-cli
+         # overlay 期望态（含 README 唯一性）。这里刻意不跑 verify.ts：它顶层 import 的
+         # coding-agent 模块要 native addon 才加载得动，完整门禁留给 binaries 作业。
+         - name: Overlay expected state
+           run: bun brand/apply.ts --check
          - name: Pre-commit hook selftest
            run: bash brand/hooks/selftest.sh
          - name: README merge driver selftest
