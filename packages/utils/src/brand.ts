@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { version as upstreamVersion } from "../package.json" with { type: "json" };
 
 /**
  * Fork 品牌单一值源（见 docs/fork/sync-strategy.md）。
@@ -38,6 +39,17 @@ export const BRAND_RELEASE_TAG_PREFIX = "zcode-v";
  * 以便同一上游版本内的 -zN 热修也能被检测到。
  */
 export const BRAND_RELEASE_ITERATION = 3;
+
+/**
+ * 面向用户展示的完整版本号：`<上游版本>-z<迭代>`（如 `17.2.12-z3`）。
+ *
+ * 裸 `package.json` 版本随上游 rebase 走，同一个 `17.2.12` 上 fork 已经发了 z1/z2/z3
+ * 三个二进制 —— 只打印上游版本号无法区分它们，用户报错时也说不清装的是哪一版。
+ * 所有展示路径（`--version`、欢迎屏、`zcode update` 的 Current version）都取这里；
+ * 版本比较仍然用 `VERSION` + `BRAND_RELEASE_ITERATION` 两个字段各自比，
+ * 不要 parse 这个字符串。
+ */
+export const BRAND_DISPLAY_VERSION = `${upstreamVersion}-z${BRAND_RELEASE_ITERATION}`;
 
 /**
  * 项目级配置兼容目录（只读发现，不作为写入目标）。

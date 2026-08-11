@@ -17,7 +17,13 @@ import * as path from "node:path";
 import { InternalUrlRouter } from "../packages/coding-agent/src/internal-urls/router";
 import { PI_LOGO } from "../packages/coding-agent/src/modes/components/welcome";
 import { ZCODE_LOGO } from "../packages/coding-agent/src/modes/components/brand-logo";
-import { BRAND_APP_NAME, BRAND_CONFIG_DIR_NAME, BRAND_DOCS_SCHEME, BRAND_ENV_PREFIX } from "../packages/utils/src/brand";
+import {
+	BRAND_APP_NAME,
+	BRAND_CONFIG_DIR_NAME,
+	BRAND_DISPLAY_VERSION,
+	BRAND_DOCS_SCHEME,
+	BRAND_ENV_PREFIX,
+} from "../packages/utils/src/brand";
 import { getConfigRootDir } from "../packages/utils/src/dirs";
 import { parseEnvFile } from "../packages/utils/src/env";
 import { auditOverlay } from "./apply";
@@ -34,7 +40,8 @@ function check(name: string, ok: boolean, detail: string): void {
 	failures.push(name);
 }
 
-// 1) CLI 身份：源码入口的 --version 是 fork 产品名。
+// 1) CLI 身份：源码入口的 --version 是 fork 产品名 + 带迭代号的完整版本。
+//    只打上游 `17.2.12` 分不出同一基版本上的 z1/z2/z3 三个二进制。
 {
 	const home = await fs.mkdtemp(path.join(os.tmpdir(), "zcode-verify-"));
 	try {
@@ -43,7 +50,8 @@ function check(name: string, ok: boolean, detail: string): void {
 			env: { ...Bun.env, HOME: home, USERPROFILE: home },
 		});
 		const out = proc.stdout.toString().trim();
-		check("cli --version", out.startsWith(`${BRAND_APP_NAME}/`), out || `exit ${proc.exitCode}`);
+		const expected = `${BRAND_APP_NAME}/${BRAND_DISPLAY_VERSION}`;
+		check("cli --version", out === expected, out === expected ? out : `${out || `exit ${proc.exitCode}`} != ${expected}`);
 	} finally {
 		await fs.rm(home, { recursive: true, force: true });
 	}

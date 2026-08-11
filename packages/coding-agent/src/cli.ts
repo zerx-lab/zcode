@@ -15,15 +15,9 @@ try {
  * lightweight CLI runner from pi-utils.
  */
 import { parentPort } from "node:worker_threads";
+import { BRAND_DISPLAY_VERSION } from "@oh-my-pi/pi-utils/brand";
 import type { CliConfig, CommandMetadata } from "@oh-my-pi/pi-utils/cli";
-import {
-	APP_NAME,
-	getActiveProfile,
-	MIN_BUN_VERSION,
-	resolveProfileEnv,
-	setProfile,
-	VERSION,
-} from "@oh-my-pi/pi-utils/dirs";
+import { APP_NAME, getActiveProfile, MIN_BUN_VERSION, resolveProfileEnv, setProfile } from "@oh-my-pi/pi-utils/dirs";
 import { interceptUnhandledRejections } from "@oh-my-pi/pi-utils/postmortem";
 import { setProcessName } from "@oh-my-pi/pi-utils/process-name";
 import { declareWorkerHostEntry, installWorkerInbox, isWorkerHostSelector } from "@oh-my-pi/pi-utils/worker-host";
@@ -409,7 +403,7 @@ export async function runCli(argv: string[]): Promise<void> {
 		process.exitCode = 1;
 		return;
 	}
-	return run({ bin: APP_NAME, version: VERSION, argv: resolved.argv, commands, metadataHelp: showHelp });
+	return run({ bin: APP_NAME, version: BRAND_DISPLAY_VERSION, argv: resolved.argv, commands, metadataHelp: showHelp });
 }
 
 // Floating call instead of top-level await: TLA forces `--bytecode` (CJS
