@@ -91,10 +91,6 @@
 
 ### Changed
 - Switched status-bar and terminal-title mark from π to zcode `Z`, and drove splash/logo gradients from the shared brand ramp
-### Fixed
-
-- Fixed the Windows system-Chrome/Edge detection probe (`isChromiumExecutable`) leaving real, unmanaged browser windows open: it verified each candidate by spawning `<exe> --version` and waiting on piped stdout, but Chrome/Edge's Windows single-instance relaunch can hand off to a brand-new PID before ever writing to that pipe, so the probe's timeout/kill only ever reached the already-exited launcher stub while the real window survived undetected — and the probe still reported failure, so `ensureChromiumExecutable` fell through to downloading and launching a third, independent Chromium on top of the two leaked system browsers. Windows candidates are exact, vendor-hardcoded install paths (unlike the PATH-resolved POSIX list), so the probe now trusts file existence there and never spawns the candidate; POSIX detection is unchanged.
-
 ## [17.2.12] - 2026-08-08
 
 ### Fixed
