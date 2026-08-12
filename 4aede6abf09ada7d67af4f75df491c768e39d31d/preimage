@@ -1,0 +1,122 @@
+<<<<<<<
+# Release
+
+Release all packages at specified version.
+=======
+# Release Command（zcode fork）
+
+在 `zcode` 分支上发布一次 fork release：GitHub Releases 是唯一分发通道，**不发 npm**。
+>>>>>>>
+
+## 版本号规则
+
+<<<<<<<
+`$ARGUMENTS`: semver version, e.g. `3.13.0`.
+
+## Version
+
+- Last release: latest git tag (`vX.Y.Z`); confirm matches `packages/*/package.json` versions.
+- No version: review commits since last tag; choose major/minor/patch; bump.
+- `major`/`minor`/`patch`: bump last tag — major `X+1.0.0`; minor `X.Y+1.0`; patch `X.Y.Z+1`.
+
+## Run
+=======
+fork 不自己造版本号，只在上游版本上叠迭代号：
+
+- **上游基版本** = `packages/coding-agent/package.json` 的 `version`（如 `17.2.12`）。它随上游 rebase 变化，**发布流程永不改动它**。
+- **fork 迭代号** = `BRAND_RELEASE_ITERATION`（`packages/utils/src/brand.ts`）。每次发布 `+1`；**上游基版本变了则重置为 `1`**（`compareForkReleases` 先比基版本再比迭代号，重置安全）。
+- **tag** = `zcode-v<基版本>-z<迭代号>`，前缀真源 `BRAND_RELEASE_TAG_PREFIX`。已发布：`zcode-v17.2.12-z1/-z2/-z3`。
+
+迭代号编进二进制供 `zcode update` 比较，忘 bump 会让已装用户检测不到本次发布 —— `brand/check-release-tag.ts` 在流水线里强制 `tag === zcode-v<package.json 版本>-z<BRAND_RELEASE_ITERATION>`，不一致直接 fail。
+
+**不要用 `bun scripts/release.ts` / `bun run release`**：那是上游流程（bump 所有 package.json、切 CHANGELOG 版本段、发 npm、推 main、打 `v*` tag），在 fork 上会污染上游版本号并撞上上游 `ci.yml`。
+
+## 参数
+
+- `$ARGUMENTS`：可选迭代号。
+  - 留空 → 在当前 `BRAND_RELEASE_ITERATION` 上 `+1`（若上游基版本自上次 tag 起变过，则取 `1`）。
+  - `4` / `z4` → 指定迭代号。
+  - 完整 tag（`zcode-v17.3.0-z1`）→ 校验基版本与 `package.json` 一致后使用。
+
+## 流程
+
+### 1. 预检
+>>>>>>>
+
+```bash
+git branch --show-current            # 必须是 zcode
+git status --porcelain               # 必须干净
+git fetch origin && git rebase origin/zcode   # CI 每天强推 zcode，本地先对齐
+git describe --tags --match 'zcode-v*' --abbrev=0
+git log --oneline <lastTag>..HEAD    # 本次发布内容
+```
+
+<<<<<<<
+### 2. 确认 changelog
+
+本次提交的 fork 侧改动都要在 `docs/fork/CHANGELOG.md` 的 `## [Unreleased]` 里有条目（fork changelog **不做版本切分**，条目常驻 `[Unreleased]`）。**绝不动 `packages/*/CHANGELOG.md`** —— 那是上游最热文件，且 fork 不发 npm。
+
+### 3. bump 迭代号
+
+编辑 `packages/utils/src/brand.ts` 的 `BRAND_RELEASE_ITERATION`，只改这一个数字。
+
+### 4. 本地门禁（与流水线同一套）
+=======
+Script automatically:
+1. Pre-flight: clean working dir; main branch.
+2. Update all `package.json` versions.
+3. Regenerate `bun.lock`.
+4. Update CHANGELOGs: `[Unreleased] → [version] - date`.
+5. Commit and tag.
+6. Push to origin.
+7. Watch CI until all workflows pass.
+
+## CI failures
+
+CI failure → script exits with error. Fix, then repeat until CI passes:
+>>>>>>>
+
+```bash
+bun brand/check-release-tag.ts zcode-v<版本>-z<N>
+bun brand/verify.ts
+bash brand/hooks/selftest.sh
+bun check
+```
+
+<<<<<<<
+### 5. 提交 + 推分支
+
+```bash
+git commit -am "chore(release): zcode-v<版本>-z<N>"
+git push origin zcode
+```
+
+commit body 写清 `BRAND_RELEASE_ITERATION <N-1> -> <N>`、上游基版本是否变化、本次包含哪些 fork 提交（照 `6ff147b60` 的格式）。
+
+### 6. 打 tag 触发流水线
+
+```bash
+git tag zcode-v<版本>-z<N>
+git push origin zcode-v<版本>-z<N>
+```
+
+tag 必须打在 `zcode` 上，**不能打在 `release` 上**（`release` 每次同步被 `git branch -f` 重建，tag 会指向被丢弃的历史）。
+
+### 7. 刷新 `release` 分支（安装一行流的来源）
+
+install 一行流拉的是 `release` 分支的 `scripts/install.{sh,ps1}`，overlay 落后会让新用户装到旧脚本：
+
+```bash
+git branch -f release zcode
+git checkout release && bun brand/apply.ts
+git add -A && git commit -m "chore(brand): overlay"
+git push -f origin release
+git checkout zcode
+```
+
+（刚跑过 `bash brand/sync.sh` 的话前四步已完成，只需 `git push -f origin release`。）
+
+**已经产出过 Release 的 tag 不要复用**：bump 迭代号发下一个 `-z<N+1>`，否则已装用户的 `zcode update` 检测不到修复。
+=======
+`watch`: re-watches CI for current commit until all checks pass.
+>>>>>>>
