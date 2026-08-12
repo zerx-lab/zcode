@@ -2,182 +2,148 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Oh My Pi Logo</title>
+  <title>zcode — brand banner</title>
+  <!--
+    Overlay 源（见 docs/fork/sync-strategy.md）：`bun brand/apply.ts` 渲染双花括号
+    占位符后落到 assets/banner.html，`bun brand/gen-hero.ts` 用无头 Chromium 把
+    #card 截成 assets/hero.png。
+
+    这里不写死任何品牌色或形状：色值全部来自 brand.ts 的 BRAND_RAMP（经 ramp 占位符
+    插值），字标直接 <img> 引同目录的 icon.svg（= brand/logo/zcode-mark.svg）。
+  -->
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      background: #000;
-      font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    :root {
+      --ramp-0: #1a68a6;
+      --ramp-1: #2396d6;
+      --ramp-2: #3dc7ff;
+      --ramp-3: #7ad9ff;
+      --ramp-4: #b0ebff;
+      --ink: #e8f4fb;
+      --muted: #7f9bb0;
+      --bg: #070d14;
     }
-    .logo-container {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      background: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 50%, #0f0f0f 100%);
-      overflow: hidden;
-    }
-    .grid {
-      position: absolute;
-      inset: 0;
-      opacity: 0.03;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
-      background-size: 40px 40px;
-    }
-    .circuit {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      opacity: 0.2;
-    }
-    .circuit.left { left: 38px; }
-    .circuit.right { right: 38px; }
-    .content {
-      position: relative;
-      z-index: 10;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100%;
+      min-height: 100vh;
+      font-family: "SF Mono", "JetBrains Mono", "Cascadia Mono", "DejaVu Sans Mono", monospace;
     }
-    .pi-container {
+    #card {
       position: relative;
-      margin-bottom: 24px;
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      background:
+        radial-gradient(120% 90% at 12% 0%, rgba(61, 199, 255, 0.16) 0%, transparent 55%),
+        radial-gradient(90% 80% at 100% 100%, rgba(26, 104, 166, 0.22) 0%, transparent 60%),
+        var(--bg);
+      color: var(--ink);
     }
-    .glow {
+    /* 底纹网格：给终端产品一点 "编辑器画布" 的质感，不抢字标。 */
+    #card::before {
+      content: "";
       position: absolute;
       inset: 0;
-      filter: blur(32px);
-      opacity: 0.3;
-      background: radial-gradient(circle, #f97316 0%, transparent 70%);
-      transform: scale(1.5);
+      background-image:
+        linear-gradient(rgba(125, 200, 235, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(125, 200, 235, 0.06) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(75% 65% at 50% 45%, #000 20%, transparent 100%);
     }
-    .pi-symbol { position: relative; }
-    .title {
-      font-size: 36px;
-      font-weight: bold;
-      letter-spacing: 0.3em;
-      color: rgba(255,255,255,0.9);
-      text-shadow: 0 0 40px rgba(249, 115, 22, 0.3);
-      margin-bottom: 12px;
+    .ramp {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 6px;
+      background: linear-gradient(90deg, var(--ramp-0), var(--ramp-1), var(--ramp-2), var(--ramp-3), var(--ramp-4));
     }
-    .tagline {
+    .body {
+      position: relative;
+      height: 100%;
       display: flex;
-      align-items: center;
-      gap: 12px;
-      color: rgba(255,255,255,0.4);
+      flex-direction: column;
+      justify-content: center;
+      gap: 30px;
+      padding: 0 96px;
     }
-    .tagline .bracket { font-size: 18px; font-weight: 300; }
-    .tagline .text { font-size: 14px; letter-spacing: 0.4em; text-transform: uppercase; }
-    .status {
-      margin-top: 24px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.3);
-      letter-spacing: 0.05em;
+    .lockup { display: flex; align-items: center; gap: 40px; }
+    /* 字标 SVG 的 path 从 viewBox x=10/120 起笔，左侧自带 ~8.3% 空白；负边距把
+       它拉回与下方文案同一条左基线。 */
+    .lockup img {
+      width: 168px;
+      height: 126px;
+      margin-left: -14px;
+      filter: drop-shadow(0 0 34px rgba(61, 199, 255, 0.42));
     }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      animation: pulse 2s infinite;
+    .wordmark {
+      font-size: 132px;
+      font-weight: 700;
+      letter-spacing: -0.045em;
+      line-height: 1;
+      background: linear-gradient(105deg, var(--ramp-4), var(--ramp-2) 55%, var(--ramp-1));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+    .tagline { font-size: 26px; letter-spacing: -0.01em; color: var(--ink); }
+    .tagline em { font-style: normal; color: var(--ramp-2); }
+    .sub { font-size: 16px; color: var(--muted); line-height: 1.65; }
+    /* 安装命令必须一行读完：换行会把 `| sh` 甩到第二块高亮底色里，看起来像被截断。 */
+    .sub code {
+      color: var(--ramp-3);
+      background: rgba(61, 199, 255, 0.09);
+      border: 1px solid rgba(61, 199, 255, 0.22);
+      border-radius: 6px;
+      padding: 5px 12px;
+      white-space: nowrap;
+    }
+    .chips { display: flex; gap: 12px; flex-wrap: wrap; }
+    .chip {
+      font-size: 18px;
+      color: var(--ramp-3);
+      border: 1px solid rgba(61, 199, 255, 0.28);
+      border-radius: 999px;
+      padding: 7px 18px;
+      background: rgba(61, 199, 255, 0.06);
     }
     .corner {
       position: absolute;
-      width: 32px;
-      height: 32px;
-      border-color: rgba(255,255,255,0.1);
-      border-style: solid;
-      border-width: 0;
+      width: 26px;
+      height: 26px;
+      border: 2px solid rgba(61, 199, 255, 0.45);
     }
-    .corner.tl { top: 16px; left: 16px; border-top-width: 2px; border-left-width: 2px; }
-    .corner.tr { top: 16px; right: 16px; border-top-width: 2px; border-right-width: 2px; }
-    .corner.bl { bottom: 16px; left: 16px; border-bottom-width: 2px; border-left-width: 2px; }
-    .corner.br { bottom: 16px; right: 16px; border-bottom-width: 2px; border-right-width: 2px; }
-    .bottom-glow {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 96px;
-      opacity: 0.5;
-      background: linear-gradient(to top, rgba(249, 115, 22, 0.05), transparent);
-    }
+    .tl { top: 30px; left: 30px; border-right: 0; border-bottom: 0; }
+    .tr { top: 30px; right: 30px; border-left: 0; border-bottom: 0; }
+    .bl { bottom: 30px; left: 30px; border-right: 0; border-top: 0; }
+    .br { bottom: 30px; right: 30px; border-left: 0; border-top: 0; }
   </style>
 </head>
 <body>
-  <div class="logo-container">
-    <div class="grid"></div>
-
-    <!-- Circuit traces - left -->
-    <svg class="circuit left" width="60" height="200" viewBox="0 0 60 200">
-      <path d="M30 0 L30 60 L10 80 L10 120 L30 140 L30 200" stroke="#f97316" stroke-width="2" fill="none"/>
-      <circle cx="30" cy="60" r="4" fill="#f97316"/>
-      <circle cx="10" cy="80" r="3" fill="#f97316"/>
-      <circle cx="10" cy="120" r="3" fill="#f97316"/>
-      <circle cx="30" cy="140" r="4" fill="#f97316"/>
-      <rect x="5" y="95" width="10" height="10" fill="none" stroke="#f97316" stroke-width="1.5"/>
-    </svg>
-
-    <!-- Circuit traces - right -->
-    <svg class="circuit right" width="60" height="200" viewBox="0 0 60 200">
-      <path d="M30 0 L30 60 L50 80 L50 120 L30 140 L30 200" stroke="#f97316" stroke-width="2" fill="none"/>
-      <circle cx="30" cy="60" r="4" fill="#f97316"/>
-      <circle cx="50" cy="80" r="3" fill="#f97316"/>
-      <circle cx="50" cy="120" r="3" fill="#f97316"/>
-      <circle cx="30" cy="140" r="4" fill="#f97316"/>
-      <rect x="45" y="95" width="10" height="10" fill="none" stroke="#f97316" stroke-width="1.5"/>
-    </svg>
-
-    <div class="content">
-      <div class="pi-container">
-        <div class="glow"></div>
-        <svg class="pi-symbol" width="120" height="90" viewBox="0 0 120 90">
-          <rect x="10" y="8" width="100" height="12" rx="2" fill="#fafafa"/>
-          <rect x="25" y="20" width="12" height="62" rx="2" fill="#fafafa"/>
-          <rect x="75" y="20" width="12" height="45" rx="2" fill="#fafafa"/>
-          <g>
-            <rect x="71" y="55" width="20" height="16" rx="3" fill="#f97316"/>
-            <rect x="76" y="59" width="3" height="8" rx="1" fill="#0d0d0d"/>
-            <rect x="82" y="59" width="3" height="8" rx="1" fill="#0d0d0d"/>
-          </g>
-          <circle cx="18" cy="14" r="2" fill="#f97316" opacity="0.8"/>
-          <circle cx="102" cy="14" r="2" fill="#f97316" opacity="0.8"/>
-        </svg>
-      </div>
-
-      <div class="title">oh my PI</div>
-
-      <div class="tagline">
-        <span class="bracket">[</span>
-        <span class="text">ai coding agent</span>
-        <span class="bracket">]</span>
-      </div>
-
-      <div class="status">
-        <div class="status-dot"></div>
-        <span>MCP · LSP · Subagents · Web Search</span>
-      </div>
-    </div>
-
+  <div id="card">
+    <div class="ramp"></div>
     <div class="corner tl"></div>
     <div class="corner tr"></div>
     <div class="corner bl"></div>
     <div class="corner br"></div>
-    <div class="bottom-glow"></div>
+    <div class="body">
+      <div class="lockup">
+        <img src="./icon.svg" alt="zcode">
+        <div class="wordmark">zcode</div>
+      </div>
+      <div class="tagline">A coding agent with the IDE wired in — <em>rebranded fork of oh-my-pi</em></div>
+      <div class="chips">
+        <div class="chip">~/.zcode</div>
+        <div class="chip">zcode://docs</div>
+        <div class="chip">ZCODE_*</div>
+      </div>
+      <div class="sub">
+        <code>curl -fsSL https://raw.githubusercontent.com/zerx-lab/zcode/release/scripts/install.sh | sh</code>
+      </div>
+    </div>
   </div>
 </body>
 </html>

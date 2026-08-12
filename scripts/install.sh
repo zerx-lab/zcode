@@ -1,28 +1,29 @@
 #!/bin/sh
 set -e
 
-# OMP Coding Agent Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/can1357/oh-my-pi/main/scripts/install.sh | sh
+# zcode installer
+# Usage: curl -fsSL https://raw.githubusercontent.com/zerx-lab/zcode/release/scripts/install.sh | sh
 #
 # Options:
-#   --source       Install via bun (installs bun if needed)
+#   --source       (unsupported in this fork: prebuilt binaries only)
 #   --binary       Always install prebuilt binary
-#   --ref <ref>    Install specific tag/commit/branch
+#   --ref <tag>    Install a specific release tag
 #   -r <ref>       Shorthand for --ref
 
-REPO="can1357/oh-my-pi"
+REPO="zerx-lab/zcode"
 PACKAGE="@oh-my-pi/pi-coding-agent"
 INSTALL_DIR="${PI_INSTALL_DIR:-$HOME/.local/bin}"
 MIN_BUN_VERSION="1.3.14"
 
 # Parse arguments
-MODE=""
+MODE="binary"
 REF=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --source)
-            MODE="source"
-            shift
+            echo "zcode installs prebuilt binaries only: @oh-my-pi/* on npm is the upstream package."
+            echo "Re-run without the source flag for the binary, or clone the repo and run 'bun run setup'."
+            exit 1
             ;;
         --binary)
             MODE="binary"
@@ -211,8 +212,8 @@ install_via_bun() {
         }
     fi
     echo ""
-    echo "✓ Installed omp via bun"
-    echo "Run 'omp' to get started!"
+    echo "✓ Installed zcode via bun"
+    echo "Run 'zcode' to get started!"
 }
 
 # Install binary from GitHub releases
@@ -238,7 +239,7 @@ install_binary() {
         fi
     fi
 
-    BINARY="omp-${PLATFORM}-${ARCH}"
+    BINARY="zcode-${PLATFORM}-${ARCH}"
     # Get release tag
     if [ -n "$REF" ]; then
         echo "Fetching release $REF..."
@@ -246,7 +247,7 @@ install_binary() {
             LATEST=$(echo "$RELEASE_JSON" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
         else
             echo "Release tag not found: $REF"
-            echo "For branch/commit installs, use --source with --ref."
+            echo "Release tags: https://github.com/zerx-lab/zcode/releases"
             exit 1
         fi
     else
@@ -265,21 +266,21 @@ install_binary() {
     # Download binary
     BINARY_URL="https://github.com/${REPO}/releases/download/${LATEST}/${BINARY}"
     echo "Downloading ${BINARY}..."
-    curl -fsSL --connect-timeout 10 --speed-limit 1024 --speed-time 30 "$BINARY_URL" -o "${INSTALL_DIR}/omp"
-    chmod +x "${INSTALL_DIR}/omp"
+    curl -fsSL --connect-timeout 10 --speed-limit 1024 --speed-time 30 "$BINARY_URL" -o "${INSTALL_DIR}/zcode"
+    chmod +x "${INSTALL_DIR}/zcode"
 
     # Verify the freshly installed binary can actually start before reporting
     # success. Bun's musl-target binaries link libstdc++/libgcc dynamically,
     # which stock Alpine/musl systems do not ship, so the download succeeds while
     # the binary exits 127 with relocation errors. Never claim success for a
     # binary that cannot run.
-    if ! SMOKE_OUTPUT="$("${INSTALL_DIR}/omp" --version 2>&1)"; then
+    if ! SMOKE_OUTPUT="$("${INSTALL_DIR}/zcode" --version 2>&1)"; then
         echo ""
-        echo "✗ omp was downloaded to ${INSTALL_DIR}/omp but cannot start:"
+        echo "✗ zcode was downloaded to ${INSTALL_DIR}/zcode but cannot start:"
         echo "$SMOKE_OUTPUT" | sed 's/^/    /'
         if [ "$PLATFORM" = "linux-musl" ]; then
             echo ""
-            echo "The musl build links libstdc++/libgcc dynamically. Install them, then re-run 'omp':"
+            echo "The musl build links libstdc++/libgcc dynamically. Install them, then re-run 'zcode':"
             if command -v apk >/dev/null 2>&1; then
                 echo "    apk add libstdc++ libgcc"
             else
@@ -290,12 +291,12 @@ install_binary() {
     fi
 
     echo ""
-    echo "✓ Installed omp to ${INSTALL_DIR}/omp"
+    echo "✓ Installed zcode to ${INSTALL_DIR}/zcode"
 
     # Check if in PATH
     case ":$PATH:" in
-        *":$INSTALL_DIR:"*) echo "Run 'omp' to get started!" ;;
-        *) echo "Add ${INSTALL_DIR} to your PATH, then run 'omp'" ;;
+        *":$INSTALL_DIR:"*) echo "Run 'zcode' to get started!" ;;
+        *) echo "Add ${INSTALL_DIR} to your PATH, then run 'zcode'" ;;
     esac
 }
 
